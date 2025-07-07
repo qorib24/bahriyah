@@ -1489,7 +1489,7 @@ function openScanner() {
     showNotification("Tunggu data produk siap...", "error");
     return;
   }
-
+  barcodeDetected = false;
   const scannerElement = document.getElementById("scanner");
   scannerElement.innerHTML = '';
   document.getElementById("modalScanner").classList.remove("hidden");
@@ -1548,6 +1548,7 @@ function handleBarcodeResult(barcode) {
   if (produk) {
     tambahKeKeranjang(produk.id);
     showNotification(`Produk "${produk.nama}" ditambahkan ke keranjang.`, 'success');
+    playBeep();
   } else {
     showNotification('Produk tidak ditemukan.', 'error');
   }
@@ -1883,9 +1884,13 @@ function renderCasbon() {
 
 // Scanner untuk Input Barcode di Form Produk
 function scanBarcodeProduk() {
+barcodeDetected = false;
   document.getElementById("modalScanner").classList.remove("hidden");
   const scannerElement = document.getElementById("scanner");
-  scannerElement.innerHTML = ''; // Kosongkan dulu isi div
+  scannerElement.innerHTML = ''; // Kosongkan isi div scanner
+
+  // Pastikan tidak ada event deteksi lama
+  Quagga.offDetected();
 
   Quagga.init({
     inputStream: {
@@ -1893,31 +1898,61 @@ function scanBarcodeProduk() {
       type: "LiveStream",
       target: scannerElement,
       constraints: {
-        facingMode: "environment"
+        facingMode: { exact: "environment" }, // Kamera belakang pasti
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
       }
     },
+    locator: {
+      patchSize: "medium", // "medium" atau coba "large" untuk device lambat
+      halfSample: false
+    },
     decoder: {
-      readers: ["ean_reader", "code_128_reader", "upc_reader"] // jenis barcode produk umum
-    }
+      readers: ["ean_reader", "code_128_reader", "upc_reader"] // Tipe barcode umum
+    },
+    locate: true
   }, function (err) {
     if (err) {
-      console.error(err);
-      showNotification("Gagal memulai kamera", "error");
+      console.error("❌ Gagal inisialisasi Quagga:", err);
+      showNotification("Gagal membuka kamera", "error");
       return;
     }
+
+    // ✅ Mulai kamera scanner
     Quagga.start();
+    showNotification("Silakan arahkan kamera ke barcode produk...", "success");
   });
 
   Quagga.onDetected(function (result) {
     const code = result.codeResult.code;
-    playBeep(); // 🔊 Bunyi keren ala kasir
+
+    // 🔊 Bunyi ala kasir
+    playBeep();
+
+    // Isi input barcode otomatis
     document.getElementById("barcodeProduk").value = code;
-    showNotification(`Barcode terdeteksi: ${code}`, "success");
+    showNotification("✅ Barcode berhasil dipindai!", "success");
+
+    // Stop scanner
     Quagga.stop();
     document.getElementById("modalScanner").classList.add("hidden");
   });
 }
 
+let barcodeDetected = false;
+
+Quagga.onDetected(function (result) {
+  if (barcodeDetected) return; // abaikan jika sudah scan
+  barcodeDetected = true;
+
+  const code = result.codeResult.code;
+  playBeep();
+  document.getElementById("barcodeProduk").value = code;
+  showNotification("✅ Barcode berhasil dipindai!", "success");
+
+  Quagga.stop();
+  document.getElementById("modalScanner").classList.add("hidden");
+});
 
 function closeScanner() {
   try {
