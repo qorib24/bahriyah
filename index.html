@@ -1497,26 +1497,45 @@ function openScanner() {
   Quagga.offDetected(); // pastikan tidak ada listener sebelumnya
 
   Quagga.init({
-    inputStream: {
-      name: "Live",
-      type: "LiveStream",
-      target: scannerElement,
-      constraints: {
-        facingMode: "environment"
-      }
-    },
-    decoder: {
-      readers: ["ean_reader", "code_128_reader", "upc_reader"]
+  inputStream: {
+    name: "Live",
+    type: "LiveStream",
+    target: scannerElement,
+    constraints: {
+      facingMode: "environment",
+      width: { ideal: 640 },
+      height: { ideal: 480 }
     }
-  }, function (err) {
-    if (err) {
-      console.error("❌ Gagal inisialisasi Quagga:", err);
-      showNotification("Gagal memulai kamera: " + err, "error");
-      return;
+  },
+  locator: {
+    patchSize: "medium",
+    halfSample: false
+  },
+  decoder: {
+    readers: ["ean_reader", "code_128_reader", "upc_reader"]
+  },
+  locate: true,
+  frequency: 5,
+  numOfWorkers: 2
+}, function (err) {
+  if (err) {
+    console.error("❌ Gagal inisialisasi Quagga:", err.name || err);
+    showNotification("Gagal membuka kamera: " + err.name, "error");
+
+    // Optional: tampilkan alert agar user tahu izin kameranya
+    if (err.name === "NotAllowedError") {
+      alert("❌ Akses kamera ditolak. Silakan izinkan akses kamera di browser.");
+    } else if (err.name === "NotFoundError") {
+      alert("❌ Kamera tidak ditemukan. Pastikan perangkat memiliki kamera.");
     }
-    console.log("✅ Quagga scanner berhasil dimulai!");
-    Quagga.start();
-  });
+
+    return;
+  }
+
+  console.log("✅ Quagga scanner berhasil dimulai!");
+  Quagga.start();
+});
+
 
   Quagga.onDetected(function (result) {
     const code = result.codeResult.code;
@@ -1563,16 +1582,24 @@ function handleBarcodeResult(barcode) {
   }
 
   const pelangganId = document.getElementById('selectPelanggan').value;
-  const metodePembayaran = document.getElementById('metodePembayaran').value;
-  const jumlahBayar = parseInt(document.getElementById('jumlahBayar').value);
-  const total = hitungTotal();
-  const kembalian = jumlahBayar - total;
-  const tanggal = new Date().toISOString().split('T')[0];
+const metodePembayaran = document.getElementById('metodePembayaran').value;
+let jumlahBayar = parseInt(document.getElementById('jumlahBayar').value); // Ubah ke let
+const total = hitungTotal();
 
+if (metodePembayaran === "casbon") {
+  jumlahBayar = 0;
+}
+const kembalian = jumlahBayar - total;
+const tanggal = new Date().toISOString().split('T')[0];
+
+// Validasi hanya jika bukan casbon
+if (metodePembayaran !== "casbon") {
   if (isNaN(jumlahBayar) || jumlahBayar < 0) {
     showNotification('Jumlah bayar harus diisi dengan benar!', 'error');
     return;
   }
+}
+
 
   const transaksiBaru = {
     pelangganId,
@@ -1884,12 +1911,10 @@ function renderCasbon() {
 
 // Scanner untuk Input Barcode di Form Produk
 function scanBarcodeProduk() {
-barcodeDetected = false;
+  barcodeDetected = false;
   document.getElementById("modalScanner").classList.remove("hidden");
   const scannerElement = document.getElementById("scanner");
-  scannerElement.innerHTML = ''; // Kosongkan isi div scanner
-
-  // Pastikan tidak ada event deteksi lama
+  scannerElement.innerHTML = '';
   Quagga.offDetected();
 
   Quagga.init({
@@ -1898,46 +1923,52 @@ barcodeDetected = false;
       type: "LiveStream",
       target: scannerElement,
       constraints: {
-        facingMode: { exact: "environment" }, // Kamera belakang pasti
-        width: { ideal: 1280 },
-        height: { ideal: 720 }
+        facingMode: "environment",
+        width: { ideal: 640 },
+        height: { ideal: 480 }
       }
     },
     locator: {
-      patchSize: "medium", // "medium" atau coba "large" untuk device lambat
+      patchSize: "medium",
       halfSample: false
     },
     decoder: {
-      readers: ["ean_reader", "code_128_reader", "upc_reader"] // Tipe barcode umum
+      readers: ["ean_reader"]
     },
     locate: true
   }, function (err) {
     if (err) {
-      console.error("❌ Gagal inisialisasi Quagga:", err);
-      showNotification("Gagal membuka kamera", "error");
+      console.error("❌ ERROR saat buka kamera:", err);
+      showNotification("❌ Gagal membuka kamera: " + (err.name || err.message), "error");
+
+      // Penjelasan interaktif
+      if (err.name === "NotAllowedError") {
+        alert("⚠️ Izin kamera ditolak. Silakan izinkan akses kamera.");
+      } else if (err.name === "NotFoundError") {
+        alert("📵 Kamera tidak ditemukan. Coba perangkat lain.");
+      }
+
       return;
     }
 
-    // ✅ Mulai kamera scanner
     Quagga.start();
-    showNotification("Silakan arahkan kamera ke barcode produk...", "success");
+    showNotification("✅ Kamera aktif. Arahkan ke barcode.", "success");
   });
 
   Quagga.onDetected(function (result) {
+    if (barcodeDetected) return;
+    barcodeDetected = true;
+
     const code = result.codeResult.code;
-
-    // 🔊 Bunyi ala kasir
     playBeep();
-
-    // Isi input barcode otomatis
     document.getElementById("barcodeProduk").value = code;
     showNotification("✅ Barcode berhasil dipindai!", "success");
 
-    // Stop scanner
     Quagga.stop();
     document.getElementById("modalScanner").classList.add("hidden");
   });
 }
+
 
 let barcodeDetected = false;
 
