@@ -8,11 +8,11 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
     <script src="https://unpkg.com/@ericblade/quagga2@1.2.6/dist/quagga.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
 
     <!-- Firebase App (core) -->
-  <script type="module">
+<script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getDatabase, ref, push, set, get, child, onValue, remove, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
@@ -298,12 +298,6 @@ window.update = update;
                     <div class="glass-effect px-4 py-2 rounded-lg">
                         <i class="fas fa-clock mr-2"></i>
                         <span id="currentTime" class="font-medium"></span>
-                    </div>
-                    <button onclick="syncWithSheets()" class="glass-effect px-4 py-2 rounded-lg hover:bg-white hover:bg-opacity-20 transition-all">
-                        <i class="fas fa-sync-alt mr-2"></i>
-                        Sync
-                    </button>
-                </div>
             </div>
         </div>
     </header>
@@ -359,11 +353,13 @@ window.update = update;
                         <div class="mb-6">
                             <input type="text" id="searchProdukKasir" placeholder="Ketik nama produk..." class="input-modern w-full pl-12">
                             <button onclick="openScanner()" class="mt-3 btn-modern btn-primary-modern">
-                  <i class="fas fa-barcode mr-2"></i> Scan Produk
-                      </button>
+  <i class="fas fa-barcode mr-2"></i> Scan Produk
+</button>
 <!-- Tempat hasil pencarian ditampilkan -->
 <div id="searchSuggestions" class="absolute z-50 w-full bg-white border rounded-lg mt-1 hidden shadow-lg max-h-60 overflow-y-auto"></div>
+
                     </div>
+
                     <!-- Keranjang Belanja -->
                     <div class="card-modern p-6">
                         <h3 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
@@ -439,11 +435,6 @@ window.update = update;
                 </div>
             </div>
         </div>
-        <div class="max-w-full p-4">
-  <h2 class="text-lg font-semibold mb-2">Grafik Penjualan 30 Hari Terakhir</h2>
-  <canvas id="grafikPenjualan" height="120"></canvas>
-</div>
-
 <!-- Modal Struk -->
 <div id="modalStruk" class="fixed inset-0 hidden bg-white p-6 z-50 overflow-y-auto print:block">
   <div class="max-w-sm mx-auto border p-4 rounded-md shadow-md print:shadow-none">
@@ -2740,87 +2731,6 @@ function tutupStruk() {
                 notification.classList.remove('show');
             }, 3000);
         }
-
-  async function tampilkanGrafikPenjualan30Hari() {
-  const ctx = document.getElementById('grafikPenjualan').getContext('2d');
-  const now = new Date();
-  const dataHarian = {};
-
-  // Siapkan 30 hari ke belakang
-  for (let i = 29; i >= 0; i--) {
-    const tanggal = new Date(now);
-    tanggal.setDate(now.getDate() - i);
-    const key = tanggal.toISOString().split('T')[0]; // format YYYY-MM-DD
-    dataHarian[key] = 0;
-  }
-
-  // Ambil data transaksi dari Firebase
-  const snapshot = await get(ref(db, "transaksi"));
-  if (snapshot.exists()) {
-    const transaksi = snapshot.val();
-
-    for (const id in transaksi) {
-      const t = transaksi[id];
-      if (!t.tanggal || typeof t.total !== 'number') continue;
-
-      // Format tanggal dari Firebase
-      let tanggalTransaksi = t.tanggal.split(',')[0].trim(); // "11/7/2025"
-      const [d, m, y] = tanggalTransaksi.split('/').map(x => x.padStart(2, '0'));
-      const iso = `${y}-${m}-${d}`; // "2025-07-11"
-
-      if (iso in dataHarian) {
-        dataHarian[iso] += t.total;
-      }
-    }
-  }
-
-  // Siapkan data untuk Chart.js
-  const labels = Object.keys(dataHarian);
-  const data = Object.values(dataHarian);
-
-  new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [{
-        label: 'Total Penjualan',
-        data,
-        backgroundColor: 'rgba(54, 162, 235, 0.6)'
-      }]
-    },
-    options: {
-      responsive: true,
-      scales: {
-        y: {
-          ticks: {
-            callback: function(value) {
-              return 'Rp ' + value.toLocaleString('id-ID');
-            }
-          },
-          beginAtZero: true
-        },
-        x: {
-          ticks: {
-            maxTicksLimit: 10
-          }
-        }
-      },
-      plugins: {
-        tooltip: {
-          callbacks: {
-            label: function(context) {
-              return 'Rp ' + context.parsed.y.toLocaleString('id-ID');
-            }
-          }
-        }
-      }
-    }
-  });
-}
-
-// Jalankan saat halaman siap
-document.addEventListener("DOMContentLoaded", tampilkanGrafikPenjualan30Hari);
-
-</script>
+    </script>
 </body>
 </html>
