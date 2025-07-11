@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -7,11 +8,13 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
     <script src="https://unpkg.com/@ericblade/quagga2@1.2.6/dist/quagga.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <!-- Firebase App (core) -->
-<script type="module">
+  <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getDatabase, ref, push, set, get, child, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+  import { getDatabase, ref, push, set, get, child, onValue, remove, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyCx-gmf73_opjxB2GT9HkTyUaJLuT--tMQ",
@@ -29,12 +32,14 @@
 
   // Simpan ke window agar bisa dipakai di file HTML
   window.db = db;
-  window.ref = ref;
-  window.push = push;
-  window.set = set;
-  window.get = get;
-  window.child = child;
-  window.onValue = onValue;
+window.ref = ref;
+window.push = push;
+window.set = set;
+window.get = get;
+window.child = child;
+window.onValue = onValue;
+window.remove = remove;
+window.update = update;
 </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -352,15 +357,13 @@
 
                         <!-- Cari Produk -->
                         <div class="mb-6">
-                            <input type="text" id="searchProduk" placeholder="Ketik nama produk..." class="input-modern w-full pl-12">
+                            <input type="text" id="searchProdukKasir" placeholder="Ketik nama produk..." class="input-modern w-full pl-12">
                             <button onclick="openScanner()" class="mt-3 btn-modern btn-primary-modern">
-  <i class="fas fa-barcode mr-2"></i> Scan Produk
-</button>
+                  <i class="fas fa-barcode mr-2"></i> Scan Produk
+                      </button>
 <!-- Tempat hasil pencarian ditampilkan -->
 <div id="searchSuggestions" class="absolute z-50 w-full bg-white border rounded-lg mt-1 hidden shadow-lg max-h-60 overflow-y-auto"></div>
-
                     </div>
-
                     <!-- Keranjang Belanja -->
                     <div class="card-modern p-6">
                         <h3 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
@@ -436,6 +439,11 @@
                 </div>
             </div>
         </div>
+        <div class="max-w-full p-4">
+  <h2 class="text-lg font-semibold mb-2">Grafik Penjualan 30 Hari Terakhir</h2>
+  <canvas id="grafikPenjualan" height="120"></canvas>
+</div>
+
 <!-- Modal Struk -->
 <div id="modalStruk" class="fixed inset-0 hidden bg-white p-6 z-50 overflow-y-auto print:block">
   <div class="max-w-sm mx-auto border p-4 rounded-md shadow-md print:shadow-none">
@@ -482,11 +490,12 @@
                         <i class="fas fa-boxes mr-3 text-indigo-600"></i>
                         Manajemen Produk
                     </h2>
-                    <button onclick="showTambahProduk()" class="btn-modern btn-primary-modern">
-                        <i class="fas fa-plus mr-2"></i>Tambah Produk
-                    </button>
                 </div>
-                
+                <div class="mb-4">
+  <input type="text" id="searchProdukManajemen" oninput="filterProduk()"
+    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+    placeholder="Cari produk berdasarkan nama atau kode...">
+</div>
                 <!-- Tabel Produk -->
                 <div class="overflow-x-auto">
                     <table class="w-full table-modern">
@@ -546,7 +555,6 @@
                     <i class="fas fa-chart-bar mr-3 text-indigo-600"></i>
                     Laporan Penjualan
                 </h2>
-                
                 <!-- Filter Laporan -->
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                     <div>
@@ -603,24 +611,65 @@
                         </div>
                     </div>
                 </div>
+                    <div class="flex flex-col md:flex-row gap-3 mb-4 w-full">
+  <button onclick="exportToExcel()" class="btn-modern btn-success-modern w-full md:w-1/2">
+    <i class="fas fa-file-excel mr-2"></i> Export ke Excel
+  </button>
+  <button onclick="hapusLaporanTerfilter()" class="btn-modern btn-danger-modern w-full md:w-1/2">
+    <i class="fas fa-trash-alt mr-2"></i> Hapus Laporan yang Terfilter
+  </button>
+</div>
+                <!-- Detail Transaksi -->
+                <div class="overflow-x-auto">
+                    <table id="laporanTable" class="w-full table-modern">
+  <thead>
+    <tr>
+      <th class="text-left">Tanggal</th>
+      <th class="text-left">Pelanggan</th>
+      <th class="text-center">Item</th>
+      <th class="text-right">Total</th>
+      <th class="text-right">Aksi</th>
+    </tr>
+  </thead>
+  <tbody id="laporanTableBody">
+    <!-- Data laporan akan dimasukkan dari JavaScript -->
+  </tbody>
+</table>
+    </div>
+      </div>
+        </div>
+    </main>
 
-                <div id="section-casbon" class="section hidden fade-in">
+    <div id="modalDetailTransaksi" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+  <div class="bg-white p-4 rounded-lg max-w-md w-full shadow-xl">
+    <h2 class="text-lg font-bold mb-2">Detail Transaksi</h2>
+    <div id="detailIsiProduk" class="space-y-2 max-h-60 overflow-y-auto text-sm">
+      <!-- Produk tampil di sini -->
+    </div>
+    <button onclick="tutupModalDetail()" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 w-full">
+      Tutup
+    </button>
+  </div>
+</div>
+
+    <div id="section-casbon" class="section hidden fade-in">
   <div class="card-modern p-6">
     <h2 class="text-2xl font-bold mb-6">
       <i class="fas fa-hand-holding-usd mr-2 text-orange-500"></i> Data Casbon Pelanggan
     </h2>
-
     <div class="overflow-x-auto">
       <table class="w-full table-modern">
         <thead>
-          <tr>
-            <th>Tanggal</th>
-            <th>Pelanggan</th>
-            <th>Total</th>
-            <th>Sisa</th>
-            <th>Status</th>
-          </tr>
-        </thead>
+  <tr>
+    <th>Tanggal</th>
+    <th>Pelanggan</th>
+    <th>Total</th>
+    <th>Sisa</th>
+    <th>Status</th>
+    <th>Aksi</th> <!-- ✅ tambahkan ini -->
+  </tr>
+</thead>
+
         <tbody id="casbonTable">
           <tr><td colspan="5" class="text-center text-gray-400 py-6">Belum ada data casbon</td></tr>
         </tbody>
@@ -628,24 +677,27 @@
     </div>
   </div>
 </div>
-                <!-- Detail Transaksi -->
-                <div class="overflow-x-auto">
-                    <table class="w-full table-modern">
-                        <thead>
-                            <tr>
-                                <th class="text-left">Tanggal</th>
-                                <th class="text-left">Pelanggan</th>
-                                <th class="text-center">Item</th>
-                                <th class="text-right">Total</th>
-                            </tr>
-                        </thead>
-                        <tbody id="laporanTable">
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </main>
+
+<!-- Modal Edit Casbon -->
+<div id="modalEditCasbon" class="hidden fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+  <div class="bg-white p-6 rounded-xl w-full max-w-md">
+    <h2 class="text-xl font-bold mb-4">Edit Casbon</h2>
+    <form id="formEditCasbon">
+      <input type="hidden" id="editCasbonId">
+      <input type="text" id="editNama" class="input-modern mb-3" placeholder="Nama" required>
+      <input type="number" id="editTotal" class="input-modern mb-3" placeholder="Total" required>
+      <select id="editStatus" class="input-modern mb-3">
+        <option value="Belum Lunas">Belum Lunas</option>
+        <option value="Lunas">Lunas</option>
+      </select>
+      <div class="flex justify-end gap-2">
+        <button type="button" onclick="closeModalEditCasbon()" class="btn-modern">Batal</button>
+        <button type="submit" class="btn-modern btn-primary-modern">Simpan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- Section Kulakan -->
 <div id="section-kulakan" class="section hidden fade-in">
   <div class="card-modern p-6">
@@ -653,16 +705,137 @@
       <i class="fas fa-truck mr-3 text-indigo-500"></i> Kulakan Barang
     </h2>
 
-    <!-- Form Kulakan -->
-    <form id="formKulakan" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-      <input type="text" id="kulakanNama" class="input-modern" placeholder="Nama Barang" required>
-      <input type="text" id="kulakanSupplier" class="input-modern" placeholder="Supplier">
-      <input type="number" id="kulakanQty" class="input-modern" placeholder="Jumlah" required>
-      <input type="number" id="kulakanHarga" class="input-modern" placeholder="Harga Satuan" required>
-      <button type="submit" class="btn-modern btn-primary-modern col-span-1 md:col-span-4">
-        <i class="fas fa-save mr-2"></i> Tambah Kulakan
-      </button>
-    </form>
+    <form id="formKulakan" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+  <!-- BARIS 1 -->
+  <div>
+    <label for="kulakanNama" class="block text-sm font-semibold text-gray-700 mb-2">Nama Produk</label>
+    <input type="text" id="kulakanNama" class="input-modern w-full" placeholder="Contoh: Indomie Goreng" required>
+  </div>
+
+  <div>
+    <label for="kulakanSupplier" class="block text-sm font-semibold text-gray-700 mb-2">Supplier</label>
+    <input type="text" id="kulakanSupplier" class="input-modern w-full" placeholder="Contoh: PT Indofood">
+  </div>
+
+<div class="mb-4">
+  <label for="kulakanBarcode" class="block text-sm font-semibold text-gray-700 mb-1">
+    Barcode Produk
+  </label>
+  
+  <input type="text" id="kulakanBarcode"
+    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+    placeholder="Ketik atau tempel barcode produk..." />
+
+  <button type="button" onclick="scanKulakanBarcode()"
+    class="mt-2 w-full sm:w-auto px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition duration-150 ease-in-out">
+    <i class="fas fa-barcode mr-2"></i> Scan Barcode
+  </button>
+</div>
+
+  <!-- BARIS 2 -->
+  <div>
+    <label for="kulakanKategori" class="block text-sm font-semibold text-gray-700 mb-2">Kategori</label>
+    <input type="text" id="kulakanKategori" class="input-modern w-full" placeholder="Contoh: Makanan Instan">
+  </div>
+
+  <div>
+    <label for="kulakanQty" class="block text-sm font-semibold text-gray-700 mb-2">Jumlah Beli</label>
+    <input type="number" id="kulakanQty" class="input-modern w-full" placeholder="Contoh: 5" required>
+  </div>
+
+  <div>
+    <label for="kulakanSatuan" class="block text-sm font-semibold text-gray-700 mb-2">Satuan</label>
+    <select id="kulakanSatuan" class="input-modern w-full" required>
+      <option value="pcs">PCS</option>
+      <option value="dus">DUS</option>
+      <option value="renteng">RENTENG</option>
+    </select>
+  </div>
+
+  <!-- BARIS 3 -->
+  <div>
+    <label for="kulakanHargaKulakan" class="block text-sm font-semibold text-gray-700 mb-2">Harga Kulakan / Satuan</label>
+    <input type="number" id="kulakanHargaKulakan" class="input-modern w-full" placeholder="Contoh: 150000" required>
+  </div>
+
+  <div>
+    <label for="kulakanHargaUmumPcs" class="block text-sm font-semibold text-gray-700 mb-2">Harga Jual Umum / PCS</label>
+    <input type="number" id="kulakanHargaUmumPcs" class="input-modern w-full" placeholder="Contoh: 3000" required>
+  </div>
+
+  <div>
+    <label for="kulakanHargaGrosirPcs" class="block text-sm font-semibold text-gray-700 mb-2">Harga Jual Grosir / PCS</label>
+    <input type="number" id="kulakanHargaGrosirPcs" class="input-modern w-full" placeholder="Contoh: 2800" required>
+  </div>
+
+  <!-- BARIS 4 -->
+  <div>
+    <label for="kulakanKonversiDus" class="block text-sm font-semibold text-gray-700 mb-2">1 Dus = ... PCS</label>
+    <input type="number" id="kulakanKonversiDus" class="input-modern w-full" value="12">
+  </div>
+
+  <div>
+    <label for="kulakanKonversiRenteng" class="block text-sm font-semibold text-gray-700 mb-2">1 Renteng = ... PCS</label>
+    <input type="number" id="kulakanKonversiRenteng" class="input-modern w-full" value="10">
+  </div>
+</form>
+
+<div class="w-full my-4">
+  <button type="submit" class="btn-modern btn-primary-modern w-full">
+    <i class="fas fa-save mr-2"></i> Simpan Kulakan & Produk
+  </button>
+</div>
+
+<div class="flex flex-col md:flex-row gap-3 w-full mb-4">
+  <button onclick="exportKulakanExcel()" class="btn-modern btn-success-modern w-full md:w-1/2">
+    <i class="fas fa-file-excel mr-2"></i> Export Kulakan ke Excel
+  </button>
+  <button onclick="hapusKulakanTerfilter()" class="btn-modern btn-danger-modern w-full md:w-1/2">
+    <i class="fas fa-trash-alt mr-2"></i> Hapus Data Kulakan Terfilter
+  </button>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+  <!-- Tanggal Mulai -->
+  <div class="w-full">
+    <label for="tanggalMulaiKulakan" class="text-sm font-semibold mb-1 block">Tanggal Mulai</label>
+    <input type="date" id="tanggalMulaiKulakan" class="input-modern w-full">
+  </div>
+
+  <!-- Tanggal Selesai -->
+  <div class="w-full">
+    <label for="tanggalSelesaiKulakan" class="text-sm font-semibold mb-1 block">Tanggal Selesai</label>
+    <input type="date" id="tanggalSelesaiKulakan" class="input-modern w-full">
+  </div>
+
+  <!-- Tombol Filter -->
+  <div class="w-full flex items-end">
+    <button onclick="filterKulakan()" class="btn-modern btn-primary-modern w-full">
+      <i class="fas fa-search mr-2"></i> Filter
+    </button>
+  </div>
+</div>
+
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+  <!-- Total Barang Masuk -->
+  <div class="w-full p-6 rounded-xl bg-gradient-to-br from-blue-400 to-purple-600 text-white flex justify-between items-center shadow-lg">
+    <div>
+      <div class="text-base font-semibold">Total Barang Masuk</div>
+      <div class="text-4xl font-bold mt-1" id="totalBarangMasuk">0</div>
+    </div>
+    <i class="fas fa-box-open text-5xl opacity-30"></i>
+  </div>
+
+  <!-- Total Harga Kulakan -->
+  <div class="w-full p-6 rounded-xl bg-gradient-to-br from-green-300 to-blue-300 text-gray-900 flex justify-between items-center shadow-lg">
+    <div>
+      <div class="text-base font-semibold">Total Harga Kulakan</div>
+      <div class="text-4xl font-bold mt-1" id="totalHargaKulakan">Rp 0</div>
+    </div>
+    <i class="fas fa-money-bill-wave text-5xl opacity-30"></i>
+  </div>
+</div>
 
     <!-- Tabel Kulakan -->
     <div class="overflow-x-auto">
@@ -846,6 +1019,11 @@
   <option value="qris">QRIS</option>
   <option value="casbon">Casbon</option> <!-- ✅ Tambahkan ini -->
         </select>
+        <div id="formNamaCasbon" class="mt-4 hidden">
+  <label class="block text-sm font-semibold text-gray-700 mb-2">Nama Pengasbon</label>
+  <input type="text" id="namaPengasbon" class="input-modern w-full" placeholder="Masukkan nama pengasbon">
+</div>
+
                 <div id="pembayaranTunai">
                     <label class="block text-sm font-semibold text-gray-700 mb-2">Jumlah Bayar</label>
                     <input type="number" id="jumlahBayar" min="0" class="input-modern w-full" placeholder="Masukkan jumlah bayar">
@@ -904,7 +1082,7 @@
     updateStatistik();
 
     // Event Listeners
-    document.getElementById('searchProduk').addEventListener('input', searchProduk);
+    document.getElementById('searchProdukKasir').addEventListener('input', searchProduk);
     document.getElementById('jumlahBayar').addEventListener('input', hitungKembalian);
     document.getElementById('metodePembayaran').addEventListener('change', togglePembayaranTunai);
 
@@ -924,24 +1102,33 @@
             });
             document.getElementById('currentTime').textContent = timeString;
         }
-async function simpanKulakanKeFirebase({ idProduk, namaProduk, jumlah, satuan, harga }) {
-  const kulakan = {
-    idProduk,
-    namaProduk,
-    jumlah,
-    satuan,
-    harga,
-    tanggal: new Date().toLocaleString('id-ID')
-  };
+async function filterKulakan() {
+  const mulai = document.getElementById("tanggalMulaiKulakan").value;
+  const selesai = document.getElementById("tanggalSelesaiKulakan").value;
 
-  try {
-    const refKulakan = push(ref(db, 'kulakan'));
-    await set(refKulakan, kulakan);
-    showNotification('Data kulakan berhasil disimpan ke Firebase!', 'success');
-  } catch (error) {
-    console.error(error);
-    showNotification('Gagal menyimpan data kulakan.', 'error');
+  if (!mulai || !selesai) {
+    alert("Pilih tanggal mulai dan tanggal selesai!");
+    return;
   }
+
+  const data = [];
+  const snapshot = await get(ref(db, "kulakan"));
+  if (snapshot.exists()) {
+    snapshot.forEach(child => {
+      const item = child.val();
+      if (item.tanggal) {
+        const [tgl] = item.tanggal.split(',');
+        const [d, m, y] = tgl.trim().split('/');
+        const isoTanggal = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+
+        if (isoTanggal >= mulai && isoTanggal <= selesai) {
+          data.push(item);
+        }
+      }
+    });
+  }
+  tampilkanSummaryKulakan();
+  renderKulakanTerfilter(data); // Tampilkan hasil
 }
 
 function ambilKulakanDariFirebase() {
@@ -949,41 +1136,274 @@ function ambilKulakanDariFirebase() {
   onValue(kulakanRef, (snapshot) => {
     const data = snapshot.val();
     dataKulakan = data ? Object.values(data) : [];
-    renderKulakan(); // tampilkan ke tabel
+    renderKulakan();
+    tampilkanSummaryKulakan();
   });
 }
-function ambilCasbonDariFirebase() {
-  const casbonRef = ref(db, 'casbon');
-  onValue(casbonRef, (snapshot) => {
-    const data = snapshot.val();
-    dataCasbon = data ? Object.values(data) : [];
-    renderCasbon(); // tampilkan ke tabel
-  });
-}
+async function hapusKulakanTerfilter() {
+  const mulai = document.getElementById("tanggalMulaiKulakan").value;
+  const selesai = document.getElementById("tanggalSelesaiKulakan").value;
 
-        // Navigation
-        function showSection(sectionName) {
-    // Hide all sections
-    document.querySelectorAll('.section').forEach(section => {
-        section.classList.add('hidden');
-    });
-    
-    // Remove active class from all nav items
-    document.querySelectorAll('.nav-item').forEach(item => {
-        item.classList.remove('active');
-    });
-    
-    // Show selected section
-    document.getElementById('section-' + sectionName).classList.remove('hidden');
-    
-    // Add active class to clicked nav item
-    event.target.classList.add('active');
+  if (!mulai || !selesai) {
+    alert("Pilih tanggal mulai dan tanggal selesai!");
+    return;
+  }
 
-    // ✅ Tambahkan baris ini untuk laporan
-    if (sectionName === 'laporan') {
-        generateLaporan();  // 🔥 ini yang bikin laporan tampil
+  if (!confirm("Yakin ingin menghapus semua data kulakan dalam rentang tanggal ini?")) return;
+
+  try {
+    const snapshot = await get(ref(db, "kulakan"));
+    if (!snapshot.exists()) {
+      alert("Tidak ada data kulakan.");
+      return;
     }
+
+    const semua = snapshot.val();
+    const updates = {};
+
+    for (const id in semua) {
+      const item = semua[id];
+      if (!item.tanggal) continue;
+
+      const [tgl] = item.tanggal.split(',');
+      const [d, m, y] = tgl.trim().split('/');
+      const isoTanggal = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+
+      if (isoTanggal >= mulai && isoTanggal <= selesai) {
+        updates[`kulakan/${id}`] = null;
+      }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      alert("Tidak ada data dalam rentang tanggal tersebut.");
+      return;
+    }
+
+    await update(ref(db), updates);
+    showNotification("Data kulakan berhasil dihapus!", "success");
+    ambilKulakanDariFirebase(); // Refresh tampilan
+  } catch (error) {
+    console.error("Gagal hapus kulakan:", error);
+    alert("Terjadi kesalahan saat menghapus.");
+  }
 }
+
+function tampilkanSummaryKulakan() {
+  let totalQty = 0;
+  let totalHarga = 0;
+
+  dataKulakan.forEach(item => {
+    const qty = Number(item.qty) || 0;
+    const subtotal = Number(item.total) || 0;
+
+    totalQty += qty;
+    totalHarga += subtotal;
+  });
+
+  document.getElementById('totalBarangMasuk').textContent = totalQty;
+  document.getElementById('totalHargaKulakan').textContent = 'Rp ' + formatRupiah(totalHarga);
+}
+function exportKulakanExcel() {
+  const table = document.getElementById("kulakanTable");
+  if (!table || table.rows.length === 0) {
+    alert("Tidak ada data kulakan yang bisa diexport.");
+    return;
+  }
+
+  try {
+    // Ambil ringkasan dari UI
+    const totalBarangMasuk = document.getElementById("totalBarangMasuk")?.textContent || "0";
+    const totalHargaKulakan = document.getElementById("totalHargaKulakan")?.textContent || "Rp 0";
+
+    // Buat ringkasan (2 baris)
+    const summary = [
+      ["Total Barang Masuk", totalBarangMasuk],
+      ["Total Harga Kulakan", totalHargaKulakan],
+      [],
+    ];
+
+    // Ambil isi data dari tabel (kita ambil langsung tr → td)
+    const headers = ["Tanggal", "Nama", "Supplier", "Qty", "Harga", "Total"];
+    const data = Array.from(table.querySelectorAll("tr")).map(row => {
+      return Array.from(row.querySelectorAll("td")).map(cell => cell.innerText.trim());
+    }).filter(row => row.length > 0); // hapus row kosong
+
+    // Gabungkan semua ke satu array
+    const finalData = [...summary, headers, ...data];
+
+    // Buat dan simpan file
+    const ws = XLSX.utils.aoa_to_sheet(finalData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Kulakan");
+    XLSX.writeFile(wb, "laporan-kulakan.xlsx");
+  } catch (error) {
+    console.error("Export gagal:", error);
+    alert("Terjadi kesalahan saat export kulakan.");
+  }
+}
+
+function formatRupiah(angka) {
+  return angka.toLocaleString('id-ID');
+}
+
+function ambilCasbonDariFirebase() {
+  const transaksiRef = ref(db, 'transaksi');
+  onValue(transaksiRef, (snapshot) => {
+    const allTransaksi = snapshot.val();
+    dataCasbon = [];
+
+    if (allTransaksi) {
+      Object.entries(allTransaksi).forEach(([key, trans]) => {
+        if (trans.metodePembayaran === 'casbon') {
+          const jumlahBayar = trans.jumlahBayar || 0;
+          const total = trans.total || 0;
+
+          if (jumlahBayar < total) {
+            dataCasbon.push({
+              key,
+              tanggal: trans.tanggal,
+              pelanggan: trans.namaPengasbon || trans.pelangganId,
+              total: total,
+              sisa: total - jumlahBayar,
+              status: 'belum lunas'
+            });
+          }
+        }
+      });
+    }
+
+    renderCasbon();
+  });
+}
+
+        function showSection(sectionName) {
+  // Sembunyikan semua section
+  document.querySelectorAll('.section').forEach(section => {
+    section.classList.add('hidden');
+  });
+
+  // Hapus "active" dari semua tombol nav
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.classList.remove('active');
+  });
+
+  // Tampilkan section utama
+  const mainSection = document.getElementById('section-' + sectionName);
+  if (mainSection) {
+    mainSection.classList.remove('hidden');
+  } else if (sectionName === 'casbon') {
+    // Tambahan khusus untuk casbon
+    document.getElementById('section-laporan').classList.remove('hidden');
+    document.getElementById('section-casbon').classList.remove('hidden');
+  }
+
+  // Tandai tombol aktif
+  event.target.classList.add('active');
+}
+
+function filterProduk() {
+  const keyword = document.getElementById('searchProdukManajemen').value.toLowerCase();
+  const hasilFilter = produkData.filter(produk =>
+    produk.nama.toLowerCase().includes(keyword) ||
+    (produk.barcode && produk.barcode.toLowerCase().includes(keyword))
+  );
+
+  tampilkanHasilFilterProduk(hasilFilter);
+}
+async function hapusLaporanTerfilter() {
+  if (!confirm("Yakin ingin menghapus semua data laporan yang tampil saat ini?")) return;
+
+  const tanggalMulai = document.getElementById('tanggalMulai').value;
+  const tanggalAkhir = document.getElementById('tanggalSelesai').value;
+
+
+  if (!tanggalMulai || !tanggalAkhir) {
+    alert("Tanggal filter belum lengkap.");
+    return;
+  }
+
+  const startDate = new Date(tanggalMulai);
+  const endDate = new Date(tanggalAkhir);
+  endDate.setHours(23, 59, 59, 999);
+
+  try {
+    const transaksiRef = ref(db, 'transaksi');
+    const snapshot = await get(transaksiRef);
+
+    if (snapshot.exists()) {
+      const semuaTransaksi = snapshot.val();
+      const updates = {};
+
+      for (const id in semuaTransaksi) {
+        const transaksi = semuaTransaksi[id];
+        if (!transaksi.tanggal) continue;
+
+        // Format tanggal kamu: "4/7/2025"
+        const waktu = new Date(transaksi.tanggal); // karena sudah dalam format YYYY-MM-DD
+        if (waktu >= startDate && waktu <= endDate) {
+          updates[`transaksi/${id}`] = null;
+        }
+      }
+
+      if (Object.keys(updates).length === 0) {
+        alert("Tidak ada data dalam rentang tanggal tersebut.");
+        return;
+      }
+
+      await update(ref(db), updates);
+      showNotification("Data laporan terfilter berhasil dihapus!", "success");
+      filterLaporan(); // Perbarui tampilan
+    }
+  } catch (err) {
+    console.error("Gagal menghapus data:", err);
+    alert("Terjadi kesalahan saat menghapus data.");
+  }
+}
+
+function tampilkanHasilFilterProduk(filteredList) {
+  const tbody = document.getElementById('produkTable');
+  tbody.innerHTML = '';
+
+  if (filteredList.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" class="text-center text-gray-400 py-6">
+          Tidak ada produk ditemukan.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  filteredList.forEach(produk => {
+    const row = `
+      <tr class="hover:bg-gray-50 transition-colors">
+        <td class="font-semibold text-gray-800">${produk.nama}</td>
+        <td class="text-gray-600">${produk.barcode || '-'}</td>
+        <td class="text-gray-600">${produk.kategori}</td>
+        <td class="text-center">
+          <span class="px-3 py-1 rounded-full text-sm font-medium ${produk.stok > 10 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+            ${produk.stok} pcs
+          </span>
+        </td>
+        <td class="text-right font-medium">Rp ${formatRupiah(produk.harga.umum.pcs)}</td>
+        <td class="text-right font-medium">Rp ${formatRupiah(produk.harga.grosir.pcs)}</td>
+        <td class="text-center">
+          <div class="flex justify-center gap-2">
+            <button onclick="editProduk('${produk.id}')" class="text-blue-600 hover:text-blue-800 transition-colors">
+              <i class="fas fa-edit"></i>
+            </button>
+            <button onclick="hapusProduk('${produk.id}')" class="text-red-600 hover:text-red-800 transition-colors">
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+    tbody.innerHTML += row;
+  });
+}
+
 
         // Produk Management
         function renderProdukTable() {
@@ -1058,9 +1478,7 @@ function ambilCasbonDariFirebase() {
         async function handleSubmitProduk(e) {
   e.preventDefault();
 
-  const produkRef = push(ref(db, 'produk'));
   const produkBaru = {
-    id: produkRef.key,
     barcode: document.getElementById('barcodeProduk').value,
     nama: document.getElementById('namaProduk').value,
     kategori: document.getElementById('kategoriProduk').value,
@@ -1081,12 +1499,22 @@ function ambilCasbonDariFirebase() {
     }
   };
 
+  let produkRef;
+  if (editMode && editId) {
+    produkBaru.id = editId;
+    produkRef = ref(db, 'produk/' + editId); // ⬅ update
+  } else {
+    produkRef = push(ref(db, 'produk')); // ⬅ buat baru
+    produkBaru.id = produkRef.key;
+  }
+
   await set(produkRef, produkBaru);
 
   showNotification('Produk berhasil disimpan di Firebase!', 'success');
   closeModalProduk();
-  ambilProdukDariFirebase(); // Update UI
+  ambilProdukDariFirebase(); // refresh tampilan produk
 }
+
 
 function ambilProdukDariFirebase() {
   const produkRef = ref(db, 'produk');
@@ -1118,9 +1546,53 @@ function ambilProdukDariFirebase() {
     console.error(error);
   }
 }
+function exportToExcel() {
+  const table = document.getElementById("laporanTable");
+  if (!table || table.rows.length <= 1) {
+    alert("Tidak ada data yang bisa diexport!");
+    return;
+  }
 
+  try {
+    // 1. Ambil nilai ringkasan
+    const totalTransaksi = document.getElementById("laporanTotalTransaksi").textContent || "0";
+    const totalPendapatan = document.getElementById("laporanTotalPendapatan").textContent || "0";
+    const produkTerjual = document.getElementById("laporanProdukTerjual").textContent || "0";
 
-        function closeModalProduk() {
+    // 2. Buat array data ringkasan
+    const summary = [
+      ["Total Transaksi", totalTransaksi],
+      ["Total Pendapatan", "Rp " + totalPendapatan],
+      ["Produk Terjual", produkTerjual],
+      [],
+    ];
+
+    // 3. Buat array data tabel tanpa kolom aksi
+    const headers = ["Tanggal", "Pelanggan", "Item", "Total"];
+    const data = Array.from(table.querySelectorAll("tbody tr")).map(row => {
+      const cells = row.querySelectorAll("td");
+      return [
+        cells[0]?.innerText.trim(), // Tanggal
+        cells[1]?.innerText.trim(), // Pelanggan
+        cells[2]?.innerText.trim(), // Item
+        cells[3]?.innerText.trim(), // Total
+      ];
+    });
+
+    const finalData = [...summary, headers, ...data];
+
+    // 4. Export
+    const ws = XLSX.utils.aoa_to_sheet(finalData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Laporan Penjualan");
+    XLSX.writeFile(wb, "laporan-penjualan.xlsx");
+  } catch (error) {
+    console.error("Gagal export:", error);
+    alert("Terjadi kesalahan saat export Excel.");
+  }
+}
+
+     function closeModalProduk() {
             document.getElementById('modalProduk').classList.add('hidden');
         }
 
@@ -1227,14 +1699,18 @@ function ambilProdukDariFirebase() {
 }
 
 
-        function hapusPelanggan(id) {
-            if (confirm('Yakin ingin menghapus pelanggan ini?')) {
-                pelangganData = pelangganData.filter(p => p.id !== id);
-                renderPelangganTable();
-                updatePelangganSelect();
-                showNotification('Pelanggan berhasil dihapus!', 'success');
-            }
-        }
+        async function hapusPelanggan(id) {
+  if (!confirm('Yakin ingin menghapus pelanggan ini?')) return;
+
+  try {
+    await remove(ref(db, `pelanggan/${id}`)); // ⬅️ Hapus dari Firebase
+    showNotification('Pelanggan berhasil dihapus!', 'success');
+    ambilPelangganDariFirebase(); // ⬅️ Refresh data
+  } catch (error) {
+    console.error(error);
+    showNotification('Gagal menghapus pelanggan.', 'error');
+  }
+}
 
         function closeModalPelanggan() {
             document.getElementById('modalPelanggan').classList.add('hidden');
@@ -1242,38 +1718,40 @@ function ambilProdukDariFirebase() {
 
         // Search Produk
         function searchProduk() {
-            const query = event.target.value.toLowerCase();
-            const suggestions = document.getElementById('searchSuggestions');
-            
-            if (query.length < 2) {
-                suggestions.classList.add('hidden');
-                return;
-            }
+  const query = event.target.value.toLowerCase();
+  const suggestions = document.getElementById('searchSuggestions');
 
-            const filtered = produkData.filter(produk => 
-                produk.nama.toLowerCase().includes(query) ||
-                produk.kategori.toLowerCase().includes(query)
-            );
+  if (query.length < 2) {
+    suggestions.classList.add('hidden');
+    return;
+  }
 
-            if (filtered.length === 0) {
-                suggestions.classList.add('hidden');
-                return;
-            }
+  const filtered = produkData.filter(produk =>
+    produk.nama.toLowerCase().includes(query) ||
+    produk.kategori.toLowerCase().includes(query) ||
+    (produk.barcode && produk.barcode.toLowerCase().includes(query)) // ✅ Tambahan ini
+  );
 
-            suggestions.innerHTML = '';
-            filtered.forEach(produk => {
-                const div = document.createElement('div');
-                div.className = 'p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0';
-                div.innerHTML = `
-                    <div class="font-semibold">${produk.nama}</div>
-                    <div class="text-sm text-gray-600">${produk.kategori} - Stok: ${produk.stok}</div>
-                `;
-                div.onclick = () => tambahKeKeranjang(produk.id);
-                suggestions.appendChild(div);
-            });
+  if (filtered.length === 0) {
+    suggestions.classList.add('hidden');
+    return;
+  }
 
-            suggestions.classList.remove('hidden');
-        }
+  suggestions.innerHTML = '';
+  filtered.forEach(produk => {
+    const div = document.createElement('div');
+    div.className = 'p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0';
+    div.innerHTML = `
+      <div class="font-semibold">${produk.nama}</div>
+      <div class="text-sm text-gray-600">${produk.kategori} - Stok: ${produk.stok}</div>
+    `;
+    div.onclick = () => tambahKeKeranjang(produk.id);
+    suggestions.appendChild(div);
+  });
+
+  suggestions.classList.remove('hidden');
+}
+
 function hitungTotal() {
   return keranjang.reduce((sum, item) => sum + item.subtotal, 0);
 }
@@ -1312,7 +1790,7 @@ function hitungTotal() {
   }
 
   renderKeranjang();
-  document.getElementById('searchProduk').value = '';
+  document.getElementById('searchProdukKasir').value = '';
   document.getElementById('searchSuggestions').classList.add('hidden');
   showNotification('Produk ditambahkan ke keranjang', 'success');
 }
@@ -1455,15 +1933,22 @@ function hitungTotal() {
         }
 
         function togglePembayaranTunai() {
-            const metode = document.getElementById('metodePembayaran').value;
-            const pembayaranTunai = document.getElementById('pembayaranTunai');
-            
-            if (metode === 'tunai') {
-                pembayaranTunai.style.display = 'block';
-            } else {
-                pembayaranTunai.style.display = 'none';
-            }
-        }
+  const metode = document.getElementById('metodePembayaran').value;
+  const pembayaranTunai = document.getElementById('pembayaranTunai');
+  const formNamaCasbon = document.getElementById('formNamaCasbon');
+
+  if (metode === 'tunai') {
+    pembayaranTunai.style.display = 'block';
+    formNamaCasbon.classList.add('hidden');
+  } else if (metode === 'casbon') {
+    pembayaranTunai.style.display = 'none';
+    formNamaCasbon.classList.remove('hidden');
+  } else {
+    pembayaranTunai.style.display = 'none';
+    formNamaCasbon.classList.add('hidden');
+  }
+}
+
 
         function hitungKembalian() {
             const total = keranjang.reduce((sum, item) => {
@@ -1482,13 +1967,24 @@ function hitungTotal() {
 
 let qrScannerInstance;
 
-function openScanner() {
+function scanKulakanBarcode() {
+  openScanner((hasilScan) => {
+    document.getElementById('kulakanBarcode').value = hasilScan;
+    playBeep(); // ✅ Tambahkan ini
+  });
+}
+
+
+function openScanner(callback = null) {
   console.log("🔍 Fungsi openScanner() dipanggil");
 
   if (!produkSiap) {
     showNotification("Tunggu data produk siap...", "error");
     return;
   }
+
+  scannerCallback = callback; // simpan callback pengguna
+
   barcodeDetected = false;
   const scannerElement = document.getElementById("scanner");
   scannerElement.innerHTML = '';
@@ -1497,50 +1993,54 @@ function openScanner() {
   Quagga.offDetected(); // pastikan tidak ada listener sebelumnya
 
   Quagga.init({
-  inputStream: {
-    name: "Live",
-    type: "LiveStream",
-    target: scannerElement,
-    constraints: {
-      facingMode: "environment",
-      width: { ideal: 640 },
-      height: { ideal: 480 }
+    inputStream: {
+      name: "Live",
+      type: "LiveStream",
+      target: scannerElement,
+      constraints: {
+        facingMode: "environment",
+        width: { ideal: 640 },
+        height: { ideal: 480 }
+      }
+    },
+    locator: {
+      patchSize: "medium",
+      halfSample: false
+    },
+    decoder: {
+      readers: ["ean_reader", "code_128_reader", "upc_reader"]
+    },
+    locate: true,
+    frequency: 5,
+    numOfWorkers: 2
+  }, function (err) {
+    if (err) {
+      console.error("❌ Gagal inisialisasi Quagga:", err.name || err);
+      showNotification("Gagal membuka kamera: " + err.name, "error");
+
+      if (err.name === "NotAllowedError") {
+        alert("❌ Akses kamera ditolak. Silakan izinkan akses kamera di browser.");
+      } else if (err.name === "NotFoundError") {
+        alert("❌ Kamera tidak ditemukan. Pastikan perangkat memiliki kamera.");
+      }
+
+      return;
     }
-  },
-  locator: {
-    patchSize: "medium",
-    halfSample: false
-  },
-  decoder: {
-    readers: ["ean_reader", "code_128_reader", "upc_reader"]
-  },
-  locate: true,
-  frequency: 5,
-  numOfWorkers: 2
-}, function (err) {
-  if (err) {
-    console.error("❌ Gagal inisialisasi Quagga:", err.name || err);
-    showNotification("Gagal membuka kamera: " + err.name, "error");
 
-    // Optional: tampilkan alert agar user tahu izin kameranya
-    if (err.name === "NotAllowedError") {
-      alert("❌ Akses kamera ditolak. Silakan izinkan akses kamera di browser.");
-    } else if (err.name === "NotFoundError") {
-      alert("❌ Kamera tidak ditemukan. Pastikan perangkat memiliki kamera.");
-    }
-
-    return;
-  }
-
-  console.log("✅ Quagga scanner berhasil dimulai!");
-  Quagga.start();
-});
-
+    console.log("✅ Quagga scanner berhasil dimulai!");
+    Quagga.start();
+  });
 
   Quagga.onDetected(function (result) {
     const code = result.codeResult.code;
     console.log("✅ Barcode terdeteksi:", code);
-    handleBarcodeResult(code);
+
+    if (typeof scannerCallback === 'function') {
+      scannerCallback(code); // panggil callback custom
+    } else {
+      handleBarcodeResult(code); // fallback default
+    }
+
     Quagga.stop();
     document.getElementById("modalScanner").classList.add("hidden");
   });
@@ -1582,24 +2082,30 @@ function handleBarcodeResult(barcode) {
   }
 
   const pelangganId = document.getElementById('selectPelanggan').value;
-const metodePembayaran = document.getElementById('metodePembayaran').value;
-let jumlahBayar = parseInt(document.getElementById('jumlahBayar').value); // Ubah ke let
-const total = hitungTotal();
+  const metodePembayaran = document.getElementById('metodePembayaran').value;
+  let jumlahBayar = parseInt(document.getElementById('jumlahBayar').value);
+  const namaPengasbon = document.getElementById('namaPengasbon')?.value || "";
+  const total = hitungTotal();
 
-if (metodePembayaran === "casbon") {
-  jumlahBayar = 0;
-}
-const kembalian = jumlahBayar - total;
-const tanggal = new Date().toISOString().split('T')[0];
+  if (metodePembayaran === "casbon") {
+    jumlahBayar = 0;
 
-// Validasi hanya jika bukan casbon
-if (metodePembayaran !== "casbon") {
-  if (isNaN(jumlahBayar) || jumlahBayar < 0) {
-    showNotification('Jumlah bayar harus diisi dengan benar!', 'error');
-    return;
+    // Validasi wajib isi nama pengasbon
+    if (!namaPengasbon.trim()) {
+      showNotification('Nama pengasbon wajib diisi!', 'error');
+      return;
+    }
   }
-}
 
+  const kembalian = jumlahBayar - total;
+  const tanggal = new Date().toISOString().split('T')[0];
+
+  if (metodePembayaran !== "casbon") {
+    if (isNaN(jumlahBayar) || jumlahBayar < 0) {
+      showNotification('Jumlah bayar harus diisi dengan benar!', 'error');
+      return;
+    }
+  }
 
   const transaksiBaru = {
     pelangganId,
@@ -1608,6 +2114,7 @@ if (metodePembayaran !== "casbon") {
     total,
     kembalian,
     tanggal,
+    namaPengasbon: metodePembayaran === "casbon" ? namaPengasbon : "", // ⬅️ Tambahkan ini
     items: keranjang.map(item => ({
       id: item.produkId,
       nama: item.nama,
@@ -1623,7 +2130,6 @@ if (metodePembayaran !== "casbon") {
     await set(transaksiRef, transaksiBaru);
     await kurangiStokProduk(transaksiBaru);
 
-    // ✅ TAMPILKAN STRUK DI SINI
     const pelanggan = pelangganData.find(p => p.id === transaksiBaru.pelangganId);
     tampilkanStruk(transaksiBaru, pelanggan, jumlahBayar, kembalian);
 
@@ -1631,12 +2137,14 @@ if (metodePembayaran !== "casbon") {
     renderKeranjang();
     closeModalCheckout();
     ambilTransaksiDariFirebase();
+    ambilCasbonDariFirebase(); // ⬅️ Tambahkan agar casbon langsung update
     showNotification('Transaksi berhasil disimpan', 'success');
   } catch (error) {
     console.error(error);
     showNotification('Gagal menyimpan transaksi.', 'error');
   }
 }
+
 
 function hitungTotal() {
   return keranjang.reduce((sum, item) => sum + (item.qty * item.harga), 0);
@@ -1660,16 +2168,74 @@ async function kurangiStokProduk(transaksi) {
 
   ambilProdukDariFirebase(); // refresh UI produk
 }
+function editCasbon(id) {
+  const casbon = dataCasbon.find(c => c.key === id);
+  if (!casbon) return;
 
+  document.getElementById('editCasbonId').value = casbon.key;
+  document.getElementById('editNama').value = casbon.pelanggan || '';
+  document.getElementById('editTotal').value = casbon.total || '';
+  document.getElementById('editStatus').value = casbon.status === 'lunas' ? 'Lunas' : 'Belum Lunas';
+
+  document.getElementById('modalEditCasbon').classList.remove('hidden');
+}
+
+function closeModalEditCasbon() {
+  document.getElementById('modalEditCasbon').classList.add('hidden');
+}
+
+document.getElementById("formEditCasbon").addEventListener("submit", async function(e) {
+  e.preventDefault();
+
+  const id = document.getElementById("editCasbonId").value;
+  const status = document.getElementById("editStatus").value;
+
+  const transaksiRef = ref(db, "transaksi/" + id);
+  const snapshot = await get(transaksiRef);
+
+  if (!snapshot.exists()) {
+    showNotification("Transaksi tidak ditemukan!", "error");
+    return;
+  }
+
+  const transaksi = snapshot.val();
+
+  if (status === "Lunas") {
+    transaksi.jumlahBayar = transaksi.total; // ✅ tandai lunas
+  } else {
+    transaksi.jumlahBayar = 0; // atau nilai sisa sebelumnya
+  }
+
+  await set(transaksiRef, transaksi);
+
+  closeModalEditCasbon();
+  showNotification("Status casbon berhasil diperbarui!", "success");
+
+  // ✅ Refresh ulang Casbon & Laporan
+  ambilCasbonDariFirebase();
+  ambilTransaksiDariFirebase();
+});
 
 function ambilTransaksiDariFirebase() {
   const transaksiRef = ref(db, 'transaksi');
   onValue(transaksiRef, (snapshot) => {
     const data = snapshot.val();
-    transaksiData = data ? Object.values(data) : [];
+    transaksiData = [];
 
-    updateStatistik();         // untuk statistik harian
-    generateLaporan();         // untuk isi laporan tabel
+    if (data) {
+      Object.entries(data).forEach(([key, trans]) => {
+        const jumlahBayar = parseInt(trans.jumlahBayar) || 0;
+        const total = parseInt(trans.total) || 0;
+
+        // ✅ Tampilkan hanya yang sudah lunas
+        if (jumlahBayar >= total) {
+          transaksiData.push({ id: key, ...trans });
+        }
+      });
+    }
+
+    generateLaporan();
+    updateStatistik();
   });
 }
 
@@ -1784,84 +2350,184 @@ async function updateAtauBuatProdukDariKulakan(nama, qty) {
         }
 
         function renderLaporanTable(transaksi) {
-            const tbody = document.getElementById('laporanTable');
-            tbody.innerHTML = '';
-
-            if (transaksi.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="4" class="text-center py-12 text-gray-500">
-                            <i class="fas fa-chart-bar text-4xl mb-4 opacity-50"></i>
-                            <p>Tidak ada data transaksi</p>
-                        </td>
-                    </tr>
-                `;
-                return;
-            }
-
-            transaksi.forEach(t => {
-                const pelanggan = pelangganData.find(p => p.id === t.pelangganId);
-                const tanggal = new Date(t.tanggal).toLocaleDateString('id-ID');
-                const totalItem = t.items.reduce((sum, item) => sum + item.qty, 0);
-
-                const row = `
-                    <tr class="hover:bg-gray-50">
-                        <td class="font-medium">${tanggal}</td>
-                        <td>${pelanggan ? pelanggan.namaToko : '-'}</td>
-                        <td class="text-center">${totalItem}</td>
-                        <td class="text-right font-bold">Rp ${formatRupiah(t.total)}</td>
-                    </tr>
-                `;
-                tbody.innerHTML += row;
-            });
-        }
-
-        let dataKulakan = [];
-
-document.getElementById('formKulakan').addEventListener('submit', async function (e) {
-  e.preventDefault();
-
-  const nama = document.getElementById('kulakanNama').value;
-  const supplier = document.getElementById('kulakanSupplier').value || '-';
-  const qty = parseInt(document.getElementById('kulakanQty').value);
-  const harga = parseInt(document.getElementById('kulakanHarga').value);
-  const total = qty * harga;
-  const tanggal = new Date().toLocaleDateString('id-ID');
-
-  const data = { tanggal, nama, supplier, qty, harga, total };
-  await simpanKulakanKeFirebase(data); // ✅ Simpan ke Firebase
-
-  renderKulakan(); // ✅ Update tampilan
-  this.reset();
-  showNotification('Data kulakan disimpan ke Firebase!', 'success');
-});
-
-async function simpanKulakanKeFirebase(kulakan) {
-  const refKulakan = push(ref(db, 'kulakan'));
-  await set(refKulakan, kulakan);
-  await updateAtauBuatProdukDariKulakan(kulakan.nama, kulakan.qty);
-}
-
-function renderKulakan() {
-  const tbody = document.getElementById('kulakanTable');
+  const tbody = document.getElementById('laporanTableBody');
   tbody.innerHTML = '';
-  if (dataKulakan.length === 0) {
-    tbody.innerHTML = `<tr>
-      <td colspan="6" class="text-center text-gray-400 py-8">Belum ada data kulakan</td>
-    </tr>`;
+
+  if (transaksi.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="5" class="text-center py-12 text-gray-500">
+          <i class="fas fa-chart-bar text-4xl mb-4 opacity-50"></i>
+          <p>Tidak ada data transaksi</p>
+        </td>
+      </tr>
+    `;
     return;
   }
 
-  dataKulakan.forEach(k => {
-    const row = `<tr class="hover:bg-gray-50">
-      <td>${k.tanggal}</td>
-      <td>${k.nama}</td>
-      <td>${k.supplier}</td>
-      <td>${k.qty}</td>
-      <td>Rp ${formatRupiah(k.harga)}</td>
-      <td><strong>Rp ${formatRupiah(k.total)}</strong></td>
-    </tr>`;
+  transaksi.forEach(t => {
+    const pelanggan = pelangganData.find(p => p.id === t.pelangganId);
+    const tanggal = new Date(t.tanggal).toLocaleDateString('id-ID');
+    const totalItem = t.items.reduce((sum, item) => sum + item.qty, 0);
+
+    const row = `
+      <tr class="hover:bg-gray-50">
+        <td class="font-medium">${tanggal}</td>
+        <td>${pelanggan ? pelanggan.namaToko : '-'}</td>
+        <td class="text-center">${totalItem}</td>
+        <td class="text-right font-bold">Rp ${formatRupiah(t.total)}</td>
+        <td class="text-center">
+          <button onclick="lihatDetailTransaksi('${t.id}')" class="text-blue-600 hover:text-blue-800 text-sm">
+            <i class="fas fa-eye"></i> Detail
+          </button>
+        </td>
+      </tr>
+    `;
     tbody.innerHTML += row;
+  });
+}
+
+function lihatDetailTransaksi(id) {
+  const trans = transaksiData.find(t => t.id === id);
+  if (!trans || !trans.items) return;
+
+  const isi = document.getElementById("detailIsiProduk");
+  isi.innerHTML = '';
+
+  trans.items.forEach(barang => {
+    const row = document.createElement('div');
+    row.className = 'flex justify-between border-b pb-1';
+    row.innerHTML = `
+      <span>${barang.nama}</span>
+      <span>${barang.qty} x Rp ${formatRupiah(barang.harga)}</span>
+    `;
+    isi.appendChild(row);
+  });
+
+  document.getElementById("modalDetailTransaksi").classList.remove("hidden");
+}
+
+function tutupModalDetail() {
+  document.getElementById("modalDetailTransaksi").classList.add("hidden");
+}
+
+
+        let dataKulakan = [];
+
+document.getElementById('formKulakan').addEventListener('submit', handleSubmitKulakan);
+
+async function handleSubmitKulakan(e) {
+  e.preventDefault();
+
+  const nama = document.getElementById('kulakanNama').value.trim();
+  const supplier = document.getElementById('kulakanSupplier').value.trim() || '-';
+  const barcode = document.getElementById('kulakanBarcode').value.trim();
+  const kategori = document.getElementById('kulakanKategori').value.trim() || '-';
+  const qty = parseInt(document.getElementById('kulakanQty').value);
+  const satuan = document.getElementById('kulakanSatuan').value;
+  const hargaKulakan = parseInt(document.getElementById('kulakanHargaKulakan').value);
+
+  const hargaUmumPcs = parseInt(document.getElementById('kulakanHargaUmumPcs').value);
+  const hargaGrosirPcs = parseInt(document.getElementById('kulakanHargaGrosirPcs').value);
+  const konversiDus = parseInt(document.getElementById('kulakanKonversiDus').value);
+  const konversiRenteng = parseInt(document.getElementById('kulakanKonversiRenteng').value);
+  const tanggal = new Date().toLocaleString('id-ID');
+
+  // Konversi ke PCS
+  let jumlahPcs = qty;
+  if (satuan === 'dus') jumlahPcs *= konversiDus;
+  if (satuan === 'renteng') jumlahPcs *= konversiRenteng;
+
+  // 🔍 Cek produk di Firebase
+  const produkRef = ref(db, 'produk');
+  const snapshot = await get(produkRef);
+  let produkKey = null;
+  let produkLama = null;
+
+  if (snapshot.exists()) {
+    snapshot.forEach(child => {
+      const data = child.val();
+      if (data.nama === nama || (barcode && data.barcode === barcode)) {
+        produkKey = child.key;
+        produkLama = data;
+      }
+    });
+  }
+
+  if (produkKey) {
+    // 🔄 Produk ada → update stok dan harga
+    const stokBaru = (produkLama.stok || 0) + jumlahPcs;
+    const dataBaru = {
+      ...produkLama,
+      stok: stokBaru,
+      konversiDus,
+      konversiRenteng,
+      harga: {
+        umum: { ...produkLama.harga?.umum, pcs: hargaUmumPcs },
+        grosir: { ...produkLama.harga?.grosir, pcs: hargaGrosirPcs }
+      }
+    };
+    await set(ref(db, 'produk/' + produkKey), dataBaru);
+  } else {
+    // 🆕 Produk belum ada → tambahkan baru
+    const newRef = push(ref(db, 'produk'));
+    await set(newRef, {
+      id: newRef.key,
+      nama,
+      barcode,
+      kategori,
+      stok: jumlahPcs,
+      konversiDus,
+      konversiRenteng,
+      harga: {
+        umum: { pcs: hargaUmumPcs },
+        grosir: { pcs: hargaGrosirPcs }
+      }
+    });
+  }
+
+  // ✅ Simpan ke Firebase `kulakan`
+  await push(ref(db, 'kulakan'), {
+    namaProduk: nama,
+    supplier,
+    barcode,
+    kategori,
+    qty,
+    satuan,
+    harga: hargaKulakan,
+    total: qty * hargaKulakan,
+    tanggal
+  });
+
+  // 🧹 Reset form
+  e.target.reset();
+
+  // 🟢 Notifikasi & Refresh
+  showNotification("Kulakan berhasil disimpan & produk diperbarui!", "success");
+  ambilProdukDariFirebase?.(); // refresh jika tersedia
+  renderKulakan?.(); // refresh tampilan kulakan jika fungsi tersedia
+}
+
+function renderKulakanTerfilter(data) {
+  const tbody = document.getElementById("kulakanTable");
+  tbody.innerHTML = "";
+
+  if (data.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-gray-400 py-4">Tidak ada data</td></tr>`;
+    return;
+  }
+
+  data.forEach(item => {
+    tbody.innerHTML += `
+      <tr>
+        <td>${item.tanggal || '-'}</td>
+        <td>${item.namaProduk || '-'}</td>
+        <td>${item.supplier || '-'}</td>
+        <td>${item.qty || 0}</td>
+        <td>Rp ${formatRupiah(item.harga || 0)}</td>
+        <td>Rp ${formatRupiah(item.total || 0)}</td>
+      </tr>
+    `;
   });
 }
 
@@ -1890,21 +2556,31 @@ async function simpanCasbon(transaksi, pelanggan) {
 
 
 function renderCasbon() {
-  const tbody = document.getElementById('casbonTable');
+  const tbody = document.getElementById("casbonTable");
   tbody.innerHTML = '';
+
   if (dataCasbon.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5" class="text-center text-gray-400 py-6">Belum ada data casbon</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-gray-400 py-6">Belum ada data casbon</td></tr>`;
     return;
   }
 
-  dataCasbon.forEach(hutang => {
-    const row = `<tr>
-      <td>${hutang.tanggal}</td>
-      <td>${hutang.pelanggan}</td>
-      <td>Rp ${formatRupiah(hutang.total)}</td>
-      <td>Rp ${formatRupiah(hutang.sisa)}</td>
-      <td class="${hutang.status === 'Lunas' ? 'text-green-600' : 'text-red-600'}">${hutang.status}</td>
-    </tr>`;
+  dataCasbon.forEach(item => {
+    const row = `
+      <tr>
+        <td>${item.tanggal}</td>
+        <td>${item.pelanggan}</td>
+        <td>Rp ${formatRupiah(item.total)}</td>
+        <td>Rp ${formatRupiah(item.sisa)}</td>
+        <td class="text-center">
+          <span class="px-2 py-1 rounded-full text-xs font-semibold ${item.status === 'lunas' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
+            ${item.status.toUpperCase()}
+          </span>
+        </td>
+        <td class="text-center">
+          <button onclick="editCasbon('${item.key}')" class="text-blue-600 hover:text-blue-800"><i class="fas fa-edit"></i></button>
+        </td>
+      </tr>
+    `;
     tbody.innerHTML += row;
   });
 }
@@ -2015,13 +2691,19 @@ function tampilkanStruk(transaksi, pelanggan, bayar, kembalian) {
     <p><strong>Metode:</strong> ${transaksi.metodePembayaran}</p>
     <p class="text-xs text-gray-500">-----------------------------------</p>
     <table class="w-full text-xs">
-      ${transaksi.items.map(item => {
-        return `<tr>
-          <td>${item.qty}x ${item.nama}</td>
-          <td class="text-right">Rp ${formatRupiah(item.qty * item.harga)}</td>
-        </tr>`;
-      }).join('')}
-    </table>
+  ${transaksi.items.map(item => {
+    const qty = Number(item.qty) || 0;
+    const hargaPerPcs = Number(item.hargaSatuan) || 0;
+    const subtotal = Number(item.subtotal) || (qty * hargaPerPcs);
+
+    return `<tr>
+      <td>${qty}x ${item.nama}</td>
+      <td class="text-right">@Rp ${formatRupiah(hargaPerPcs)}</td>
+      <td class="text-right">Rp ${formatRupiah(subtotal)}</td>
+    </tr>`;
+  }).join('')}
+</table>
+
     <p class="text-xs text-gray-500">-----------------------------------</p>
     <p><strong>Total:</strong> Rp ${formatRupiah(transaksi.total)}</p>
     <p><strong>Bayar:</strong> Rp ${formatRupiah(bayar)}</p>
@@ -2058,6 +2740,87 @@ function tutupStruk() {
                 notification.classList.remove('show');
             }, 3000);
         }
-    </script>
+
+  async function tampilkanGrafikPenjualan30Hari() {
+  const ctx = document.getElementById('grafikPenjualan').getContext('2d');
+  const now = new Date();
+  const dataHarian = {};
+
+  // Siapkan 30 hari ke belakang
+  for (let i = 29; i >= 0; i--) {
+    const tanggal = new Date(now);
+    tanggal.setDate(now.getDate() - i);
+    const key = tanggal.toISOString().split('T')[0]; // format YYYY-MM-DD
+    dataHarian[key] = 0;
+  }
+
+  // Ambil data transaksi dari Firebase
+  const snapshot = await get(ref(db, "transaksi"));
+  if (snapshot.exists()) {
+    const transaksi = snapshot.val();
+
+    for (const id in transaksi) {
+      const t = transaksi[id];
+      if (!t.tanggal || typeof t.total !== 'number') continue;
+
+      // Format tanggal dari Firebase
+      let tanggalTransaksi = t.tanggal.split(',')[0].trim(); // "11/7/2025"
+      const [d, m, y] = tanggalTransaksi.split('/').map(x => x.padStart(2, '0'));
+      const iso = `${y}-${m}-${d}`; // "2025-07-11"
+
+      if (iso in dataHarian) {
+        dataHarian[iso] += t.total;
+      }
+    }
+  }
+
+  // Siapkan data untuk Chart.js
+  const labels = Object.keys(dataHarian);
+  const data = Object.values(dataHarian);
+
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Total Penjualan',
+        data,
+        backgroundColor: 'rgba(54, 162, 235, 0.6)'
+      }]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        y: {
+          ticks: {
+            callback: function(value) {
+              return 'Rp ' + value.toLocaleString('id-ID');
+            }
+          },
+          beginAtZero: true
+        },
+        x: {
+          ticks: {
+            maxTicksLimit: 10
+          }
+        }
+      },
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              return 'Rp ' + context.parsed.y.toLocaleString('id-ID');
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+// Jalankan saat halaman siap
+document.addEventListener("DOMContentLoaded", tampilkanGrafikPenjualan30Hari);
+
+</script>
 </body>
 </html>
