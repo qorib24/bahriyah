@@ -439,9 +439,9 @@ window.update = update;
 <div id="modalStruk" class="fixed inset-0 hidden bg-white p-6 z-50 overflow-y-auto print:block">
   <div class="max-w-sm mx-auto border p-4 rounded-md shadow-md print:shadow-none">
     <div class="text-center mb-4">
-      <h2 class="text-xl font-bold">KasirKu</h2>
-      <p class="text-sm">Jl. Usaha No.1, Telp: 08123456789</p>
-      <p class="text-xs text-gray-500">-----------------------------------</p>
+      <h2 class="text-xl font-bold">TOKO POJOK BAHRIYAH</h2>
+      <p class="text-sm">Jl. Simpang Tiga Partellon, Jati Jajar Palengaan laok palengaan pamekasam</p>
+      <p class="text-xs text-gray-500">--------------------------------------------------------------</p>
     </div>
 
     <div id="strukIsi" class="text-sm">
@@ -677,6 +677,7 @@ window.update = update;
       <input type="hidden" id="editCasbonId">
       <input type="text" id="editNama" class="input-modern mb-3" placeholder="Nama" required>
       <input type="number" id="editTotal" class="input-modern mb-3" placeholder="Total" required>
+      <input type="number" id="editCasbonSisa" class="input-modern mb-3" placeholder="Sisa Hutang" required>
       <select id="editStatus" class="input-modern mb-3">
         <option value="Belum Lunas">Belum Lunas</option>
         <option value="Lunas">Lunas</option>
@@ -731,7 +732,7 @@ window.update = update;
 
   <div>
     <label for="kulakanQty" class="block text-sm font-semibold text-gray-700 mb-2">Jumlah Beli</label>
-    <input type="number" id="kulakanQty" class="input-modern w-full" placeholder="Contoh: 5" required>
+    <input type="number" id="kulakanQty" class="input-modern w-full" placeholder="Contoh: 5">
   </div>
 
   <div>
@@ -753,11 +754,30 @@ window.update = update;
     <label for="kulakanHargaUmumPcs" class="block text-sm font-semibold text-gray-700 mb-2">Harga Jual Umum / PCS</label>
     <input type="number" id="kulakanHargaUmumPcs" class="input-modern w-full" placeholder="Contoh: 3000" required>
   </div>
+<div>
+  <label for="kulakanHargaUmumDus" class="block text-sm font-semibold text-gray-700 mb-2">Harga Jual Umum / DUS</label>
+  <input type="number" id="kulakanHargaUmumDus" class="input-modern w-full" placeholder="Contoh: 30000">
+</div>
+
+<div>
+  <label for="kulakanHargaUmumRenteng" class="block text-sm font-semibold text-gray-700 mb-2">Harga Jual Umum / RENTENG</label>
+  <input type="number" id="kulakanHargaUmumRenteng" class="input-modern w-full" placeholder="Contoh: 15000">
+</div>
 
   <div>
     <label for="kulakanHargaGrosirPcs" class="block text-sm font-semibold text-gray-700 mb-2">Harga Jual Grosir / PCS</label>
     <input type="number" id="kulakanHargaGrosirPcs" class="input-modern w-full" placeholder="Contoh: 2800" required>
   </div>
+
+  <div>
+  <label for="kulakanHargaGrosirDus" class="block text-sm font-semibold text-gray-700 mb-2">Harga Jual Grosir / DUS</label>
+  <input type="number" id="kulakanHargaGrosirDus" class="input-modern w-full" placeholder="Contoh: 28000">
+</div>
+
+<div>
+  <label for="kulakanHargaGrosirRenteng" class="block text-sm font-semibold text-gray-700 mb-2">Harga Jual Grosir / RENTENG</label>
+  <input type="number" id="kulakanHargaGrosirRenteng" class="input-modern w-full" placeholder="Contoh: 14000">
+</div>
 
   <!-- BARIS 4 -->
   <div>
@@ -769,7 +789,8 @@ window.update = update;
     <label for="kulakanKonversiRenteng" class="block text-sm font-semibold text-gray-700 mb-2">1 Renteng = ... PCS</label>
     <input type="number" id="kulakanKonversiRenteng" class="input-modern w-full" value="10">
   </div>
-        <div class="w-full my-4">
+
+  <div class="w-full my-4">
   <button type="submit" class="btn-modern btn-primary-modern w-full">
     <i class="fas fa-save mr-2"></i> Simpan Kulakan & Produk
   </button>
@@ -1236,35 +1257,27 @@ function formatRupiah(angka) {
   return angka.toLocaleString('id-ID');
 }
 
-function ambilCasbonDariFirebase() {
-  const transaksiRef = ref(db, 'transaksi');
-  onValue(transaksiRef, (snapshot) => {
-    const allTransaksi = snapshot.val();
-    dataCasbon = [];
+async function ambilCasbonDariFirebase() {
+  const snapshot = await get(ref(db, 'casbon'));
+  dataCasbon = [];
 
-    if (allTransaksi) {
-      Object.entries(allTransaksi).forEach(([key, trans]) => {
-        if (trans.metodePembayaran === 'casbon') {
-          const jumlahBayar = trans.jumlahBayar || 0;
-          const total = trans.total || 0;
-
-          if (jumlahBayar < total) {
-            dataCasbon.push({
-              key,
-              tanggal: trans.tanggal,
-              pelanggan: trans.namaPengasbon || trans.pelangganId,
-              total: total,
-              sisa: total - jumlahBayar,
-              status: 'belum lunas'
-            });
-          }
-        }
+  if (snapshot.exists()) {
+    snapshot.forEach(child => {
+      const data = child.val();
+      dataCasbon.push({
+        key: child.key,
+        tanggal: data.tanggal || '-',
+        pelanggan: data.namaPengasbon || data.pelanggan || data.pelangganId || '-',
+        total: data.total || 0,
+        sisa: data.sisa ?? (data.total - (data.jumlahBayar || 0)),
+        status: data.status || 'belum lunas'
       });
-    }
+    });
+  }
 
-    renderCasbon();
-  });
+  renderCasbon();
 }
+
 
         function showSection(sectionName) {
   // Sembunyikan semua section
@@ -2079,8 +2092,6 @@ function handleBarcodeResult(barcode) {
 
   if (metodePembayaran === "casbon") {
     jumlahBayar = 0;
-
-    // Validasi wajib isi nama pengasbon
     if (!namaPengasbon.trim()) {
       showNotification('Nama pengasbon wajib diisi!', 'error');
       return;
@@ -2104,7 +2115,9 @@ function handleBarcodeResult(barcode) {
     total,
     kembalian,
     tanggal,
-    namaPengasbon: metodePembayaran === "casbon" ? namaPengasbon : "", // ⬅️ Tambahkan ini
+    namaPengasbon: metodePembayaran === "casbon" ? namaPengasbon : "",
+    status: metodePembayaran === "casbon" ? "Belum Lunas" : "Lunas",
+    sisa: metodePembayaran === "casbon" ? total : 0,
     items: keranjang.map(item => ({
       id: item.produkId,
       nama: item.nama,
@@ -2116,7 +2129,11 @@ function handleBarcodeResult(barcode) {
   };
 
   try {
-    const transaksiRef = push(ref(db, 'transaksi'));
+    // ⬇️ SIMPAN KE LOKASI YANG SESUAI
+    const transaksiRef = metodePembayaran === 'casbon'
+      ? push(ref(db, 'casbon'))
+      : push(ref(db, 'transaksi'));
+
     await set(transaksiRef, transaksiBaru);
     await kurangiStokProduk(transaksiBaru);
 
@@ -2127,7 +2144,7 @@ function handleBarcodeResult(barcode) {
     renderKeranjang();
     closeModalCheckout();
     ambilTransaksiDariFirebase();
-    ambilCasbonDariFirebase(); // ⬅️ Tambahkan agar casbon langsung update
+    ambilCasbonDariFirebase(); // refresh tampilan casbon
     showNotification('Transaksi berhasil disimpan', 'success');
   } catch (error) {
     console.error(error);
@@ -2179,31 +2196,41 @@ document.getElementById("formEditCasbon").addEventListener("submit", async funct
 
   const id = document.getElementById("editCasbonId").value;
   const status = document.getElementById("editStatus").value;
+  const sisa = parseInt(document.getElementById("editCasbonSisa").value) || 0;
 
-  const transaksiRef = ref(db, "transaksi/" + id);
-  const snapshot = await get(transaksiRef);
+  const casbonRef = ref(db, "casbon/" + id);
+  const snapshot = await get(casbonRef);
 
   if (!snapshot.exists()) {
-    showNotification("Transaksi tidak ditemukan!", "error");
+    showNotification("Casbon tidak ditemukan!", "error");
     return;
   }
 
   const transaksi = snapshot.val();
+  transaksi.status = status;
+  transaksi.sisa = sisa;
 
   if (status === "Lunas") {
-    transaksi.jumlahBayar = transaksi.total; // ✅ tandai lunas
+    transaksi.jumlahBayar = transaksi.total;
+    transaksi.tanggalLunas = new Date().toISOString().split("T")[0];
+
+    // Simpan ke laporan dulu
+    const transaksiRef = push(ref(db, "transaksi"));
+    await set(transaksiRef, transaksi);
+
+
+    // Baru hapus dari casbon
+    await remove(casbonRef);
   } else {
-    transaksi.jumlahBayar = 0; // atau nilai sisa sebelumnya
+    // Jika belum lunas, update datanya
+    await set(casbonRef, transaksi);
   }
 
-  await set(transaksiRef, transaksi);
-
   closeModalEditCasbon();
-  showNotification("Status casbon berhasil diperbarui!", "success");
+  showNotification("Status & sisa casbon berhasil diperbarui!", "success");
 
-  // ✅ Refresh ulang Casbon & Laporan
-  ambilCasbonDariFirebase();
-  ambilTransaksiDariFirebase();
+  ambilCasbonDariFirebase?.();
+  ambilTransaksiDariFirebase?.();
 });
 
 function ambilTransaksiDariFirebase() {
@@ -2408,27 +2435,34 @@ document.getElementById('formKulakan').addEventListener('submit', handleSubmitKu
 
 async function handleSubmitKulakan(e) {
   e.preventDefault();
+  console.log("🛠️ Fungsi handleSubmitKulakan dijalankan!");
 
   const nama = document.getElementById('kulakanNama').value.trim();
   const supplier = document.getElementById('kulakanSupplier').value.trim() || '-';
   const barcode = document.getElementById('kulakanBarcode').value.trim();
   const kategori = document.getElementById('kulakanKategori').value.trim() || '-';
-  const qty = parseInt(document.getElementById('kulakanQty').value);
+
+  const qtyVal = document.getElementById('kulakanQty').value.trim();
+  const qty = qtyVal === "" ? 0 : parseInt(qtyVal);
+
   const satuan = document.getElementById('kulakanSatuan').value;
   const hargaKulakan = parseInt(document.getElementById('kulakanHargaKulakan').value);
 
-  const hargaUmumPcs = parseInt(document.getElementById('kulakanHargaUmumPcs').value);
-  const hargaGrosirPcs = parseInt(document.getElementById('kulakanHargaGrosirPcs').value);
-  const konversiDus = parseInt(document.getElementById('kulakanKonversiDus').value);
-  const konversiRenteng = parseInt(document.getElementById('kulakanKonversiRenteng').value);
+  const hargaUmumPcs = parseInt(document.getElementById('kulakanHargaUmumPcs').value) || 0;
+  const hargaUmumDus = parseInt(document.getElementById('kulakanHargaUmumDus').value) || 0;
+  const hargaUmumRenteng = parseInt(document.getElementById('kulakanHargaUmumRenteng').value) || 0;
+  const hargaGrosirPcs = parseInt(document.getElementById('kulakanHargaGrosirPcs').value) || 0;
+  const hargaGrosirDus = parseInt(document.getElementById('kulakanHargaGrosirDus').value) || 0;
+  const hargaGrosirRenteng = parseInt(document.getElementById('kulakanHargaGrosirRenteng').value) || 0;
+
+  const konversiDus = parseInt(document.getElementById('kulakanKonversiDus').value) || 1;
+  const konversiRenteng = parseInt(document.getElementById('kulakanKonversiRenteng').value) || 1;
   const tanggal = new Date().toLocaleString('id-ID');
 
-  // Konversi ke PCS
   let jumlahPcs = qty;
   if (satuan === 'dus') jumlahPcs *= konversiDus;
   if (satuan === 'renteng') jumlahPcs *= konversiRenteng;
 
-  // 🔍 Cek produk di Firebase
   const produkRef = ref(db, 'produk');
   const snapshot = await get(produkRef);
   let produkKey = null;
@@ -2444,22 +2478,30 @@ async function handleSubmitKulakan(e) {
     });
   }
 
+  const hargaBaru = {
+    umum: {
+      pcs: hargaUmumPcs,
+      dus: hargaUmumDus,
+      renteng: hargaUmumRenteng
+    },
+    grosir: {
+      pcs: hargaGrosirPcs,
+      dus: hargaGrosirDus,
+      renteng: hargaGrosirRenteng
+    }
+  };
+
   if (produkKey) {
-    // 🔄 Produk ada → update stok dan harga
     const stokBaru = (produkLama.stok || 0) + jumlahPcs;
     const dataBaru = {
       ...produkLama,
       stok: stokBaru,
       konversiDus,
       konversiRenteng,
-      harga: {
-        umum: { ...produkLama.harga?.umum, pcs: hargaUmumPcs },
-        grosir: { ...produkLama.harga?.grosir, pcs: hargaGrosirPcs }
-      }
+      harga: hargaBaru
     };
     await set(ref(db, 'produk/' + produkKey), dataBaru);
   } else {
-    // 🆕 Produk belum ada → tambahkan baru
     const newRef = push(ref(db, 'produk'));
     await set(newRef, {
       id: newRef.key,
@@ -2469,14 +2511,10 @@ async function handleSubmitKulakan(e) {
       stok: jumlahPcs,
       konversiDus,
       konversiRenteng,
-      harga: {
-        umum: { pcs: hargaUmumPcs },
-        grosir: { pcs: hargaGrosirPcs }
-      }
+      harga: hargaBaru
     });
   }
 
-  // ✅ Simpan ke Firebase `kulakan`
   await push(ref(db, 'kulakan'), {
     namaProduk: nama,
     supplier,
@@ -2485,18 +2523,17 @@ async function handleSubmitKulakan(e) {
     qty,
     satuan,
     harga: hargaKulakan,
-    total: qty * hargaKulakan,
+    total: qty * hargaKulakan || 0,
     tanggal
   });
 
-  // 🧹 Reset form
   e.target.reset();
-
-  // 🟢 Notifikasi & Refresh
   showNotification("Kulakan berhasil disimpan & produk diperbarui!", "success");
-  ambilProdukDariFirebase?.(); // refresh jika tersedia
-  renderKulakan?.(); // refresh tampilan kulakan jika fungsi tersedia
+  ambilProdukDariFirebase?.();
+  renderKulakan?.();
 }
+
+
 
 function renderKulakanTerfilter(data) {
   const tbody = document.getElementById("kulakanTable");
@@ -2679,7 +2716,7 @@ function tampilkanStruk(transaksi, pelanggan, bayar, kembalian) {
     <p><strong>Tanggal:</strong> ${tanggal}</p>
     <p><strong>Pelanggan:</strong> ${pelanggan.namaToko}</p>
     <p><strong>Metode:</strong> ${transaksi.metodePembayaran}</p>
-    <p class="text-xs text-gray-500">-----------------------------------</p>
+    <p class="text-xs text-gray-500">------------------------------------------------------------------------------</p>
     <table class="w-full text-xs">
   ${transaksi.items.map(item => {
     const qty = Number(item.qty) || 0;
@@ -2694,11 +2731,11 @@ function tampilkanStruk(transaksi, pelanggan, bayar, kembalian) {
   }).join('')}
 </table>
 
-    <p class="text-xs text-gray-500">-----------------------------------</p>
+    <p class="text-xs text-gray-500">-----------------------------------------------------------------------------</p>
     <p><strong>Total:</strong> Rp ${formatRupiah(transaksi.total)}</p>
     <p><strong>Bayar:</strong> Rp ${formatRupiah(bayar)}</p>
     <p><strong>Kembali:</strong> Rp ${formatRupiah(kembalian)}</p>
-    <p class="text-xs text-center mt-4">Terima kasih telah berbelanja!</p>
+    <p class="text-xs text-center mt-4">Terima kasih telah berbelanja di toko kami!</p>
   `;
   container.innerHTML = html;
   document.getElementById('modalStruk').classList.remove('hidden');
