@@ -280,6 +280,16 @@ window.update = update;
         .notification.error {
             background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
         }
+        @media print {
+  body * {
+    display: none;
+  }
+
+  #modalStruk, #modalStruk * {
+    display: block;
+  }
+}
+
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
