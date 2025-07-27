@@ -440,8 +440,8 @@ window.update = update;
   <div class="max-w-sm mx-auto border p-4 rounded-md shadow-md print:shadow-none">
     <div class="text-center mb-4">
       <h2 class="text-xl font-bold">TOKO POJOK BAHRIYAH</h2>
-      <p class="text-sm">Jl. Simpang Tiga Partellon, Jati Jajar Palengaan laok palengaan pamekasam</p>
-      <p class="text-xs text-gray-500">-------------------------------------------------------</p>
+      <p class="text-sm">Jl. Simpang Tiga Partellon, Jati Jajar Palengaan laok palengaan pamekasa</p>
+      <p class="text-xs text-gray-500">--------------------------------------------------------------</p>
     </div>
 
     <div id="strukIsi" class="text-sm">
@@ -2716,7 +2716,7 @@ function tampilkanStruk(transaksi, pelanggan, bayar, kembalian) {
     <p><strong>Tanggal:</strong> ${tanggal}</p>
     <p><strong>Pelanggan:</strong> ${pelanggan.namaToko}</p>
     <p><strong>Metode:</strong> ${transaksi.metodePembayaran}</p>
-    <p class="text-xs text-gray-500">----------------------------------------------------</p>
+    <p class="text-xs text-gray-500">-----------------------------------------------------------------------------</p>
     <table class="w-full text-xs">
   ${transaksi.items.map(item => {
     const qty = Number(item.qty) || 0;
@@ -2731,7 +2731,7 @@ function tampilkanStruk(transaksi, pelanggan, bayar, kembalian) {
   }).join('')}
 </table>
 
-    <p class="text-xs text-gray-500">----------------------------------------------------</p>
+    <p class="text-xs text-gray-500">-----------------------------------------------------------------------------</p>
     <p><strong>Total:</strong> Rp ${formatRupiah(transaksi.total)}</p>
     <p><strong>Bayar:</strong> Rp ${formatRupiah(bayar)}</p>
     <p><strong>Kembali:</strong> Rp ${formatRupiah(kembalian)}</p>
