@@ -2704,16 +2704,10 @@ function tampilkanStruk(transaksi, pelanggan, bayar, kembalian) {
   const tanggal = tanggalObj.toLocaleDateString('id-ID');
   const jam = tanggalObj.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-  // Fungsi bantu untuk meluruskan baris kanan
-  function formatBarisKanan(label, nilai) {
-    const labelStr = label.padEnd(22, ' ');
-    const nilaiStr = `Rp ${formatRupiah(nilai)}`.padStart(18, ' ');
-    return `${labelStr}${nilaiStr}`;
-  }
-
   let isi = `
-<pre style="font-family: 'Courier New', monospace; font-size: 13px; font-weight: bold; line-height: 1.4;">
-${tanggal.padEnd(26)}${pelanggan.namaToko}
+<pre style="font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.4;">
+
+${tanggal.padEnd(20)}${pelanggan.namaToko}
 ${jam}
 ------------------------------------------`;
 
@@ -2721,31 +2715,29 @@ ${jam}
     const qty = Number(item.qty) || 0;
     const harga = Number(item.hargaSatuan) || 0;
     const subtotal = qty * harga;
-    const namaItem = item.nama.toUpperCase().slice(0, 30);
-
-    const detail = `${qty} x ${formatRupiah(harga)}`;
-    const hargaStr = `Rp ${formatRupiah(subtotal)}`.padStart(18, ' ');
 
     isi += `
-${namaItem}
-${detail.padEnd(22)}${hargaStr}`;
+${item.nama.toUpperCase()}
+${String(qty)} x ${formatRupiah(harga).padEnd(10)}${'Rp'.padEnd(3)}${formatRupiah(subtotal).padStart(10)}`;
   });
 
   isi += `
 ------------------------------------------
-${formatBarisKanan('Total', transaksi.total)}
-${formatBarisKanan('Bayar (Cash)', bayar)}
-${formatBarisKanan('Kembali', kembalian)}
+Total        ${'Rp'.padEnd(3)}${formatRupiah(transaksi.total).padStart(10)}
+Bayar (Cash) ${'Rp'.padEnd(3)}${formatRupiah(bayar).padStart(10)}
+Kembali      ${'Rp'.padEnd(3)}${formatRupiah(kembalian).padStart(10)}
 ------------------------------------------
 
-       Terimakasih sudah berbelanja
+         Terimakasih sudah berbelanja
                di toko kami
+         
 </pre>`;
 
   container.innerHTML = isi;
   document.getElementById('modalStruk').classList.remove('hidden');
   document.getElementById('strukButtons').classList.remove('hidden');
 }
+        
 function cetakRawBT(transaksi) {
   let struk = '';
   struk += ' TOKO POJOK BAHRIYAH\n';
