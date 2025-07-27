@@ -10,6 +10,8 @@
     <script src="https://unpkg.com/@ericblade/quagga2@1.2.6/dist/quagga.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/escpos-encoder@0.6.2/encoder.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qz-tray/qz-tray.js"></script>
+
 
 
     <!-- Firebase App (core) -->
@@ -2763,6 +2765,33 @@ function cetakRawBT(transaksi) {
 
   const rawbtUrl = 'rawbt:print?text=' + encodeURIComponent(struk);
   window.location.href = rawbtUrl;
+}
+        
+function cetakStrukQZ(transaksi) {
+  const struk = `
+TOKO POJOK BAHRIYAH
+Jl. Simpang Tiga Partellon
+-----------------------------
+${transaksi.items.map(item => 
+  `${item.nama} x${item.qty} Rp${item.subtotal.toLocaleString('id-ID')}`
+).join('\n')}
+-----------------------------
+TOTAL : Rp${transaksi.total.toLocaleString('id-ID')}
+Terima kasih!\n\n\n`;
+
+  qz.websocket.connect().then(() => {
+    return qz.printers.find(); // default printer
+  }).then(printer => {
+    const config = qz.configs.create(printer);
+    const data = [{ type: 'raw', format: 'plain', data: struk }];
+    return qz.print(config, data);
+  }).then(() => {
+    alert('Struk berhasil dicetak!');
+    qz.websocket.disconnect();
+  }).catch(err => {
+    console.error(err);
+    alert('Gagal cetak struk via QZ Tray.');
+  });
 }
 
 function tutupStruk() {
