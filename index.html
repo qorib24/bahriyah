@@ -8,7 +8,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
     <script src="https://unpkg.com/@ericblade/quagga2@1.2.6/dist/quagga.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://unpkg.com/escpos-encoder@0.6.2/encoder.min.js"></script>
 
 
     <!-- Firebase App (core) -->
@@ -455,9 +456,10 @@ window.update = update;
       <button onclick="tutupStruk()" class="btn-modern btn-danger-modern w-full">
         <i class="fas fa-times mr-2"></i>Tutup
       </button>
-          <button onclick="printBluetooth()" class="btn-modern btn-success-modern w-full mb-2">
-    <i class="fas fa-bluetooth-b mr-2"></i> Cetak via Bluetooth
-  </button>
+        <button onclick="printStrukBluetooth(dataTerakhirTransaksi)" class="btn-modern btn-success-modern w-full mb-2">
+  <i class="fas fa-bluetooth-b mr-2"></i> Cetak via Bluetooth
+</button>
+
     </div>
   </div>
 </div>
@@ -2732,39 +2734,56 @@ function tampilkanStruk(transaksi, pelanggan, bayar, kembalian) {
 document.getElementById('strukButtons').classList.remove('hidden'); // Tampilkan tombol
 
 }
-
-<!-- Script Bluetooth -->
-async function printBluetooth() {
+async function printStrukBluetooth(transaksi) {
   try {
     const device = await navigator.bluetooth.requestDevice({
-      filters: [{ namePrefix: 'Printer' }],
-      optionalServices: [0x1101]
+      acceptAllDevices: true,
+      optionalServices: [0x1101] // ganti jika perlu sesuai printer kamu
     });
 
     const server = await device.gatt.connect();
     const service = await server.getPrimaryService(0x1101);
     const characteristic = await service.getCharacteristic(0x2A00);
 
-    const encoder = new TextEncoder(); // UTF-8
-    const struk = `
-TOKO POJOK BAHRIYAH
-Jl. Simpang Tiga Partellon
-============================
-Produk A       x2     Rp6.000
-Produk B       x1     Rp3.000
-============================
-TOTAL                Rp15.000
+    // Gunakan encoder ESC/POS
+    const encoder = new EscPosEncoder();
+    const result = encoder
+      .initialize()
+      .codepage('cp1252')
+      .align('center')
+      .bold(true)
+      .line('TOKO POJOK BAHRIYAH')
+      .bold(false)
+      .line('Jl. Simpang Tiga Partellon')
+      .line('-----------------------------')
+      .align('left');
 
-Terima kasih!
-`;
+    transaksi.items.forEach(item => {
+      const nama = item.nama.padEnd(12);
+      const qty = `x${item.qty}`;
+      const harga = `Rp${item.total.toLocaleString('id-ID')}`;
+      result.line(`${nama} ${qty} ${harga}`);
+    });
 
-    const data = encoder.encode(struk);
-    await characteristic.writeValue(data);
+    result
+      .line('-----------------------------')
+      .align('right')
+      .bold(true)
+      .line(`TOTAL : Rp${transaksi.total.toLocaleString('id-ID')}`)
+      .bold(false)
+      .newline()
+      .align('center')
+      .line('Terima kasih!')
+      .newline()
+      .cut('full');
 
-    alert('Struk berhasil dikirim via Bluetooth!');
+    const bytes = result.encode();
+    await characteristic.writeValue(bytes);
+
+    alert('Struk berhasil dicetak via Bluetooth!');
   } catch (err) {
     console.error('Gagal print:', err);
-    alert('Gagal koneksi ke printer Bluetooth.');
+    alert('Bluetooth printer tidak tersedia atau gagal koneksi.');
   }
 }
 function tutupStruk() {
