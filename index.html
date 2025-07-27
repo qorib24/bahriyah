@@ -2732,18 +2732,25 @@ document.getElementById('strukButtons').classList.remove('hidden'); // Tampilkan
 
 }
 function cetakRawBT(transaksi) {
-  let struk = 'TOKO POJOK BAHRIYAH\nJl. Simpang Tiga Partellon\n';
-  struk += '===========================\n';
+  let struk = 'TOKO POJOK BAHRIYAH\n';
+  struk += 'Jl. Simpang Tiga Partellon\n';
+  struk += '============================\n';
+
   transaksi.items.forEach(item => {
-    struk += `${item.nama} x${item.qty} Rp${item.total.toLocaleString('id-ID')}\n`;
+    const nama = item.nama.padEnd(16).slice(0, 16); // Maks 16 karakter
+    const qty = `x${item.qty}`.padEnd(4);
+    const harga = `Rp${item.subtotal.toLocaleString('id-ID')}`;
+    struk += `${nama}${qty}${harga}\n`;
   });
-  struk += '===========================\n';
+
+  struk += '============================\n';
   struk += `TOTAL : Rp${transaksi.total.toLocaleString('id-ID')}\n\n`;
   struk += 'Terima kasih!\n';
 
   const rawbtUrl = 'rawbt:print?text=' + encodeURIComponent(struk);
-  window.open(rawbtUrl, '_blank');
+  window.location.href = rawbtUrl;
 }
+
 function tutupStruk() {
   document.getElementById('modalStruk').classList.add('hidden');
 }
