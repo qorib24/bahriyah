@@ -455,6 +455,9 @@ window.update = update;
       <button onclick="tutupStruk()" class="btn-modern btn-danger-modern w-full">
         <i class="fas fa-times mr-2"></i>Tutup
       </button>
+          <button onclick="printBluetooth()" class="btn-modern btn-success-modern w-full mb-2">
+    <i class="fas fa-bluetooth-b mr-2"></i> Cetak via Bluetooth
+  </button>
     </div>
   </div>
 </div>
@@ -2730,6 +2733,40 @@ document.getElementById('strukButtons').classList.remove('hidden'); // Tampilkan
 
 }
 
+<!-- Script Bluetooth -->
+async function printBluetooth() {
+  try {
+    const device = await navigator.bluetooth.requestDevice({
+      filters: [{ namePrefix: 'Printer' }],
+      optionalServices: [0x1101]
+    });
+
+    const server = await device.gatt.connect();
+    const service = await server.getPrimaryService(0x1101);
+    const characteristic = await service.getCharacteristic(0x2A00);
+
+    const encoder = new TextEncoder(); // UTF-8
+    const struk = `
+TOKO POJOK BAHRIYAH
+Jl. Simpang Tiga Partellon
+============================
+Produk A       x2     Rp6.000
+Produk B       x1     Rp3.000
+============================
+TOTAL                Rp15.000
+
+Terima kasih!
+`;
+
+    const data = encoder.encode(struk);
+    await characteristic.writeValue(data);
+
+    alert('Struk berhasil dikirim via Bluetooth!');
+  } catch (err) {
+    console.error('Gagal print:', err);
+    alert('Gagal koneksi ke printer Bluetooth.');
+  }
+}
 function tutupStruk() {
   document.getElementById('modalStruk').classList.add('hidden');
 }
