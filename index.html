@@ -2088,7 +2088,7 @@ function handleBarcodeResult(barcode) {
   }
 
   const kembalian = jumlahBayar - total;
-  const tanggal = new Date().toISOString().split('T')[0];
+  const tanggal = new Date().toISOString(); // ✅ lengkap dengan jam dan detik
 
   if (metodePembayaran !== "casbon") {
     if (isNaN(jumlahBayar) || jumlahBayar < 0) {
@@ -2700,36 +2700,51 @@ function playBeep() {
 
 function tampilkanStruk(transaksi, pelanggan, bayar, kembalian) {
   const container = document.getElementById('strukIsi');
-  const tanggal = new Date(transaksi.tanggal).toLocaleString('id-ID');
-  let html = `
-    <p><strong>Tanggal:</strong> ${tanggal}</p>
-    <p><strong>Pelanggan:</strong> ${pelanggan.namaToko}</p>
-    <p><strong>Metode:</strong> ${transaksi.metodePembayaran}</p>
-    <p class="text-xs text-gray-500">---------------------------------------------------------------</p>
-    <table class="w-full text-xs">
-  ${transaksi.items.map(item => {
+  const tanggalObj = new Date(transaksi.tanggal);
+  const tanggal = tanggalObj.toLocaleDateString('id-ID');
+  const jam = tanggalObj.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+  // Fungsi bantu untuk meluruskan baris kanan
+  function formatBarisKanan(label, nilai) {
+    const labelStr = label.padEnd(22, ' ');
+    const nilaiStr = `Rp ${formatRupiah(nilai)}`.padStart(18, ' ');
+    return `${labelStr}${nilaiStr}`;
+  }
+
+  let isi = `
+<pre style="font-family: 'Courier New', monospace; font-size: 13px; font-weight: bold; line-height: 1.4;">
+${tanggal.padEnd(26)}${pelanggan.namaToko}
+${jam}
+------------------------------------------`;
+
+  transaksi.items.forEach(item => {
     const qty = Number(item.qty) || 0;
-    const hargaPerPcs = Number(item.hargaSatuan) || 0;
-    const subtotal = Number(item.subtotal) || (qty * hargaPerPcs);
+    const harga = Number(item.hargaSatuan) || 0;
+    const subtotal = qty * harga;
+    const namaItem = item.nama.toUpperCase().slice(0, 30);
 
-    return `<tr>
-      <td>${qty}x ${item.nama}</td>
-      <td class="text-right">@Rp ${formatRupiah(hargaPerPcs)}</td>
-      <td class="text-right">Rp ${formatRupiah(subtotal)}</td>
-    </tr>`;
-  }).join('')}
-</table>
+    const detail = `${qty} x ${formatRupiah(harga)}`;
+    const hargaStr = `Rp ${formatRupiah(subtotal)}`.padStart(18, ' ');
 
-    <p class="text-xs text-gray-500">---------------------------------------------------------------</p>
-    <p><strong>Total:</strong> Rp ${formatRupiah(transaksi.total)}</p>
-    <p><strong>Bayar:</strong> Rp ${formatRupiah(bayar)}</p>
-    <p><strong>Kembali:</strong> Rp ${formatRupiah(kembalian)}</p>
-    <p class="text-xs text-center mt-4">Terima kasih telah berbelanja di toko kami!</p>
-  `;
-  container.innerHTML = html;
+    isi += `
+${namaItem}
+${detail.padEnd(22)}${hargaStr}`;
+  });
+
+  isi += `
+------------------------------------------
+${formatBarisKanan('Total', transaksi.total)}
+${formatBarisKanan('Bayar (Cash)', bayar)}
+${formatBarisKanan('Kembali', kembalian)}
+------------------------------------------
+
+       Terimakasih sudah berbelanja
+               di toko kami
+</pre>`;
+
+  container.innerHTML = isi;
   document.getElementById('modalStruk').classList.remove('hidden');
-document.getElementById('strukButtons').classList.remove('hidden'); // Tampilkan tombol
-
+  document.getElementById('strukButtons').classList.remove('hidden');
 }
 function cetakRawBT(transaksi) {
   let struk = '';
