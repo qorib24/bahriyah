@@ -458,20 +458,7 @@ window.update = update;
     </div>
   </div>
 </div>
-    <div id="strukIsi" class="text-sm">
-      <!-- Struk akan diisi dengan JS -->
-    </div>
-
-    <!-- ✅ Pindahkan tombol ke sini -->
-    <div id="strukButtons" class="mt-6 text-center print:hidden hidden">
-      <button onclick="window.print()" class="btn-modern btn-primary-modern w-full mb-2">
-        <i class="fas fa-print mr-2"></i> Cetak Struk
-      </button>
-      <button onclick="tutupStruk()" class="btn-modern btn-danger-modern w-full">
-        <i class="fas fa-times mr-2"></i> Tutup
-      </button>
-    </div>
-  </div>
+ </div>
 </div>
         <!-- Section Produk -->
         <div id="section-produk" class="section hidden fade-in">
@@ -2716,7 +2703,7 @@ function tampilkanStruk(transaksi, pelanggan, bayar, kembalian) {
     <p><strong>Tanggal:</strong> ${tanggal}</p>
     <p><strong>Pelanggan:</strong> ${pelanggan.namaToko}</p>
     <p><strong>Metode:</strong> ${transaksi.metodePembayaran}</p>
-    <p class="text-xs text-gray-500">-----------------------------------------------------------------------------</p>
+    <p class="text-xs text-gray-500">---------------------------------------------------------------</p>
     <table class="w-full text-xs">
   ${transaksi.items.map(item => {
     const qty = Number(item.qty) || 0;
@@ -2731,7 +2718,7 @@ function tampilkanStruk(transaksi, pelanggan, bayar, kembalian) {
   }).join('')}
 </table>
 
-    <p class="text-xs text-gray-500">-----------------------------------------------------------------------------</p>
+    <p class="text-xs text-gray-500">---------------------------------------------------------------</p>
     <p><strong>Total:</strong> Rp ${formatRupiah(transaksi.total)}</p>
     <p><strong>Bayar:</strong> Rp ${formatRupiah(bayar)}</p>
     <p><strong>Kembali:</strong> Rp ${formatRupiah(kembalian)}</p>
