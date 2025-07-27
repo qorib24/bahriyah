@@ -456,10 +456,7 @@ window.update = update;
       <button onclick="tutupStruk()" class="btn-modern btn-danger-modern w-full">
         <i class="fas fa-times mr-2"></i>Tutup
       </button>
-        <button onclick="printStrukBluetooth(dataTerakhirTransaksi)" class="btn-modern btn-success-modern w-full mb-2">
-  <i class="fas fa-bluetooth-b mr-2"></i> Cetak via Bluetooth
-</button>
-
+        <button onclick="cetakRawBT(transaksi)">🖨️ Cetak via RawBT</button>
     </div>
   </div>
 </div>
@@ -2734,57 +2731,19 @@ function tampilkanStruk(transaksi, pelanggan, bayar, kembalian) {
 document.getElementById('strukButtons').classList.remove('hidden'); // Tampilkan tombol
 
 }
-async function printStrukBluetooth(transaksi) {
-  try {
-    const device = await navigator.bluetooth.requestDevice({
-      acceptAllDevices: true,
-      optionalServices: [0x1101] // ganti jika perlu sesuai printer kamu
-    });
+function cetakRawBT(transaksi) {
+  let struk = 'TOKO POJOK BAHRIYAH\nJl. Simpang Tiga Partellon\n';
+  struk += '===========================\n';
+  transaksi.items.forEach(item => {
+    struk += `${item.nama} x${item.qty} Rp${item.total.toLocaleString('id-ID')}\n`;
+  });
+  struk += '===========================\n';
+  struk += `TOTAL : Rp${transaksi.total.toLocaleString('id-ID')}\n\n`;
+  struk += 'Terima kasih!\n';
 
-    const server = await device.gatt.connect();
-    const service = await server.getPrimaryService(0x1101);
-    const characteristic = await service.getCharacteristic(0x2A00);
-
-    // Gunakan encoder ESC/POS
-    const encoder = new EscPosEncoder();
-    const result = encoder
-      .initialize()
-      .codepage('cp1252')
-      .align('center')
-      .bold(true)
-      .line('TOKO POJOK BAHRIYAH')
-      .bold(false)
-      .line('Jl. Simpang Tiga Partellon')
-      .line('-----------------------------')
-      .align('left');
-
-    transaksi.items.forEach(item => {
-      const nama = item.nama.padEnd(12);
-      const qty = `x${item.qty}`;
-      const harga = `Rp${item.total.toLocaleString('id-ID')}`;
-      result.line(`${nama} ${qty} ${harga}`);
-    });
-
-    result
-      .line('-----------------------------')
-      .align('right')
-      .bold(true)
-      .line(`TOTAL : Rp${transaksi.total.toLocaleString('id-ID')}`)
-      .bold(false)
-      .newline()
-      .align('center')
-      .line('Terima kasih!')
-      .newline()
-      .cut('full');
-
-    const bytes = result.encode();
-    await characteristic.writeValue(bytes);
-
-    alert('Struk berhasil dicetak via Bluetooth!');
-  } catch (err) {
-    console.error('Gagal print:', err);
-    alert('Bluetooth printer tidak tersedia atau gagal koneksi.');
-  }
+  const rawbtUrl = 'rawbt:print?text=' + encodeURIComponent(struk);
+  window.open(rawbtUrl, '_blank');
+}
 }
 function tutupStruk() {
   document.getElementById('modalStruk').classList.add('hidden');
