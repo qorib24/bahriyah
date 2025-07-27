@@ -2732,27 +2732,31 @@ document.getElementById('strukButtons').classList.remove('hidden'); // Tampilkan
 
 }
 function cetakRawBT(transaksi) {
-  document.getElementById('modalStruk').classList.add('hidden'); // Sembunyikan modal
-
-  let struk = 'TOKO POJOK BAHRIYAH\n';
+  let struk = '';
+  struk += ' TOKO POJOK BAHRIYAH\n';
   struk += 'Jl. Simpang Tiga Partellon\n';
-  struk += '============================\n';
+  struk += '-------------------------------\n';
 
   transaksi.items.forEach(item => {
-    const nama = item.nama.padEnd(16).slice(0, 16);
+    const nama = item.nama.slice(0, 16).padEnd(16); // max 16 karakter nama
     const qty = `x${item.qty}`.padEnd(4);
     const harga = `Rp${item.subtotal.toLocaleString('id-ID')}`;
     struk += `${nama}${qty}${harga}\n`;
   });
 
-  struk += '============================\n';
-  struk += `TOTAL : Rp${transaksi.total.toLocaleString('id-ID')}\n\n`;
+  struk += '-------------------------------\n';
+  struk += `TOTAL : Rp${transaksi.total.toLocaleString('id-ID')}\n`;
   struk += 'Terima kasih!\n';
+
+  // 🔧 Tambahkan feed sedikit saja
+  struk += '\n\n\n';
+
+  // 🔧 (Opsional) Tambahkan perintah cut ESC/POS:
+  struk += String.fromCharCode(29) + 'V' + String.fromCharCode(1); // Cut jika printer mendukung
 
   const rawbtUrl = 'rawbt:print?text=' + encodeURIComponent(struk);
   window.location.href = rawbtUrl;
 }
-
 
 function tutupStruk() {
   document.getElementById('modalStruk').classList.add('hidden');
