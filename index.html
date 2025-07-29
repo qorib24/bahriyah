@@ -1,4 +1,5 @@
 
+
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -1104,6 +1105,7 @@ window.update = update;
             });
             document.getElementById('currentTime').textContent = timeString;
         }
+
 async function filterKulakan() {
   const mulai = document.getElementById("tanggalMulaiKulakan").value;
   const selesai = document.getElementById("tanggalSelesaiKulakan").value;
@@ -1968,23 +1970,46 @@ function scanKulakanBarcode() {
   });
 }
 
+let isScannerDetected = false;
+let scannerTimeout;
+
+document.getElementById('searchProdukKasir').addEventListener('input', (e) => {
+  clearTimeout(scannerTimeout);
+
+  // Anggap inputan sangat cepat itu dari scanner
+  if (!isScannerDetected) {
+    isScannerDetected = true;
+    console.log("🖨️ Deteksi: USB scanner aktif");
+  }
+
+  // Reset flag jika tidak ada input lagi selama 1 detik
+  scannerTimeout = setTimeout(() => {
+    isScannerDetected = false;
+    console.log("📷 Deteksi: USB scanner nonaktif, kamera bisa digunakan");
+  }, 1000);
+});
+
 
 function openScanner(callback = null) {
   console.log("🔍 Fungsi openScanner() dipanggil");
 
+  if (isScannerDetected) {
+    showNotification("🖨️ USB Scanner aktif, gunakan scanner untuk input barcode.", "success");
+    return; // Jangan lanjut buka kamera
+  }
+
   if (!produkSiap) {
-    showNotification("Tunggu data produk siap...", "error");
+    showNotification("⏳ Tunggu data produk siap...", "error");
     return;
   }
 
-  scannerCallback = callback; // simpan callback pengguna
-
+  scannerCallback = callback;
   barcodeDetected = false;
   const scannerElement = document.getElementById("scanner");
   scannerElement.innerHTML = '';
   document.getElementById("modalScanner").classList.remove("hidden");
 
-  Quagga.offDetected(); // pastikan tidak ada listener sebelumnya
+  Quagga.offDetected();
 
   Quagga.init({
     inputStream: {
@@ -2030,15 +2055,16 @@ function openScanner(callback = null) {
     console.log("✅ Barcode terdeteksi:", code);
 
     if (typeof scannerCallback === 'function') {
-      scannerCallback(code); // panggil callback custom
+      scannerCallback(code);
     } else {
-      handleBarcodeResult(code); // fallback default
+      handleBarcodeResult(code);
     }
 
     Quagga.stop();
     document.getElementById("modalScanner").classList.add("hidden");
   });
 }
+
 
 function closeScanner() {
   try {
