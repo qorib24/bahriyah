@@ -11,10 +11,8 @@
     <script src="https://unpkg.com/@ericblade/quagga2@1.2.6/dist/quagga.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/escpos-encoder@0.6.2/encoder.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/qz-tray/qz-tray.js"></script>
-
-
-
     <!-- Firebase App (core) -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -284,6 +282,59 @@ window.update = update;
         .notification.error {
             background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
         }
+        
+@media print {
+  body {
+    margin: 0;
+    padding: 0;
+  }
+
+  #modalStruk {
+    width: 58mm !important; /* Sesuaikan dengan lebar kertas printer thermal */
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 0;
+  }
+
+  #modalStruk > div {
+    width: 100%;
+    padding: 0;
+    box-shadow: none;
+    border: none;
+  }
+
+  * {
+    font-size: 10pt; /* Ukuran font kecil supaya muat */
+    font-family: monospace;
+  }
+
+  .print\:hidden {
+    display: none !important;
+  }
+
+  .print\:block {
+    display: block !important;
+  }
+
+  .text-center {
+    text-align: center;
+  }
+
+  .text-right {
+    text-align: right;
+  }
+
+  .text-left {
+    text-align: left;
+  }
+}
+  .container {
+    max-width: 1024px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
@@ -442,12 +493,11 @@ window.update = update;
 <!-- Modal Struk -->
 <div id="modalStruk" class="fixed inset-0 hidden bg-white p-6 z-50 overflow-y-auto print:block">
   <div class="max-w-sm mx-auto border p-4 rounded-md shadow-md print:shadow-none">
-    <div class="text-center mb-4">
+    <div class="text-center">
       <h2 class="text-xl font-bold">TOKO POJOK BAHRIYAH</h2>
       <p class="text-sm">Jl. Simpang Tiga Partellon, Jati Jajar Palengaan laok palengaan pamekasan</p>
-      <p class="text-xs text-gray-500">--------------------------------------------------------------</p>
+      <p class="text-xs text-gray-500">--------------------</p>
     </div>
-
     <div id="strukIsi" class="text-sm">
       <!-- Struk akan diisi dengan JS -->
     </div>
@@ -598,6 +648,9 @@ window.update = update;
   <button onclick="exportToExcel()" class="btn-modern btn-success-modern w-full md:w-1/2">
     <i class="fas fa-file-excel mr-2"></i> Export ke Excel
   </button>
+  <button onclick="exportToPDF()" class="btn-modern btn-danger-modern w-full md:w-1/2 mt-2">
+  <i class="fas fa-file-pdf mr-2"></i> Export ke PDF
+</button>
   <button onclick="hapusLaporanTerfilter()" class="btn-modern btn-danger-modern w-full md:w-1/2">
     <i class="fas fa-trash-alt mr-2"></i> Hapus Laporan yang Terfilter
   </button>
@@ -1060,6 +1113,7 @@ window.update = update;
 </div>
     <!-- Notification -->
     <div id="notification" class="notification"></div>
+<input type="text" id="scannerInput" style="opacity:0; position:fixed; top:-1000px;" autocomplete="off" />
 
     <script>
         // Data Storage
@@ -1588,6 +1642,50 @@ function exportToExcel() {
   }
 }
 
+function exportToPDF() {
+  const laporanTable = document.getElementById('laporanTable');
+  const mulai = document.getElementById('tanggalMulai').value || '-';
+  const akhir = document.getElementById('tanggalSelesai').value || '-';
+  const totalTransaksi = document.getElementById('laporanTotalTransaksi').textContent;
+  const totalPendapatan = document.getElementById('laporanTotalPendapatan').textContent;
+  const produkTerjual = document.getElementById('laporanProdukTerjual').textContent;
+
+  if (!laporanTable) {
+    alert("Tabel laporan tidak ditemukan!");
+    return;
+  }
+
+  const clonedTable = laporanTable.cloneNode(true);
+  clonedTable.classList.remove('table-auto', 'w-full', 'text-sm');
+
+  // Buat wrapper div untuk PDF
+  const wrapper = document.createElement('div');
+  wrapper.style.padding = "10px";
+  wrapper.style.fontSize = "12px";
+  wrapper.style.color = "#000";
+  wrapper.innerHTML = `
+    <h2 style="font-size:18px; font-weight:bold; margin-bottom:10px;">Laporan Penjualan</h2>
+    <p><strong>Periode:</strong> ${mulai} s.d ${akhir}</p>
+    <p><strong>Total Transaksi:</strong> ${totalTransaksi}</p>
+    <p><strong>Total Pendapatan:</strong> Rp ${totalPendapatan}</p>
+    <p><strong>Produk Terjual:</strong> ${produkTerjual}</p>
+    <br/>
+  `;
+
+  wrapper.appendChild(clonedTable);
+
+  const opt = {
+    margin:       0.5,
+    filename:     'laporan-penjualan.pdf',
+    image:        { type: 'jpeg', quality: 0.98 },
+    html2canvas:  { scale: 2 },
+    jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+  };
+
+  html2pdf().set(opt).from(wrapper).save();
+}
+
+
      function closeModalProduk() {
             document.getElementById('modalProduk').classList.add('hidden');
         }
@@ -1960,6 +2058,56 @@ function hitungTotal() {
             
             document.getElementById('kembalian').textContent = formatRupiah(Math.max(0, kembalian));
         }
+
+        let barcodeBuffer = '';
+let lastScanTime = 0;
+
+document.addEventListener('keydown', function(e) {
+  const now = Date.now();
+
+  if (now - lastScanTime > 100) {
+    barcodeBuffer = '';
+  }
+
+  lastScanTime = now;
+
+  if (e.key === 'Enter') {
+    const scannedCode = barcodeBuffer.trim();
+    barcodeBuffer = '';
+
+    if (scannedCode.length > 3) {
+      handleBarcodeScan(scannedCode);
+    }
+  } else {
+    barcodeBuffer += e.key;
+  }
+});
+
+function handleBarcodeScan(barcode) {
+  if (!produkSiap || !produkData.length) return;
+
+  const produk = produkData.find(p => p.barcode === barcode);
+  if (!produk) {
+    showNotification('Produk dengan barcode tersebut tidak ditemukan!', 'error');
+    return;
+  }
+
+  tambahKeKeranjang(produk.id); // ⬅️ panggil fungsi milikmu
+}
+function cariProdukDanMasukkanKeKeranjang(barcode) {
+  if (!produkData || produkData.length === 0) {
+    showNotification('⏳ Data produk belum siap, silakan tunggu...', 'error');
+    return;
+  }
+
+  const produk = produkData.find(p => p.barcode === barcode);
+  if (produk) {
+    tambahKeKeranjang(produk, 1);
+    showNotification(`✅ Produk "${produk.nama}" ditambahkan ke keranjang.`, 'success');
+  } else {
+    showNotification(`❌ Produk dengan barcode "${barcode}" tidak ditemukan.`, 'error');
+  }
+}
 
 let qrScannerInstance;
 
@@ -2730,17 +2878,38 @@ function tampilkanStruk(transaksi, pelanggan, bayar, kembalian) {
   const container = document.getElementById('strukIsi');
   const tanggalObj = new Date(transaksi.tanggal);
   const tanggal = tanggalObj.toLocaleDateString('id-ID');
-  const jam = tanggalObj.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const jam = tanggalObj.toLocaleTimeString('id-ID', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
+
+  // Fungsi bantu merapikan
+  function padRight(str, length) {
+    return (str + ' '.repeat(length)).substring(0, length);
+  }
+
+  function padLeft(str, length) {
+    return (' '.repeat(length) + str).slice(-length);
+  }
+
+  function centerText(text, width = 32) {
+    const space = Math.floor((width - text.length) / 2);
+    return ' '.repeat(space) + text;
+  }
 
   let isi = `
 <pre style="
-  font-family: 'Consolas', monospace;
-  font-size: 11px;
-  line-height: 1.2;
+ font-family: 'Consolas;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
   color: #000;
-  margin: 0;
-  max-width: 250px;
-  white-space: pre-wrap;
+  margin: 0 auto;
+  padding: 0;
+  max-width: 210px; /* cocok untuk 48mm area cetak */
+  white-space: pre;
+  word-break: break-word;
 ">
 
 ${tanggal}  ${pelanggan.namaToko}
@@ -2753,26 +2922,24 @@ ${jam}
     const harga = Number(item.hargaSatuan) || 0;
     const subtotal = qty * harga;
 
-    isi += `${item.nama.toUpperCase().slice(0, 24)}\n`;
-    isi += `${qty} x ${formatRupiah(harga).padEnd(10)}Rp${formatRupiah(subtotal).padStart(8)}\n`;
+    isi += padRight(item.nama.toUpperCase().slice(0, 24), 24) + '\n';
+    isi += `${qty} x ${padRight(formatRupiah(harga), 10)} Rp${padLeft(formatRupiah(subtotal), 8)}\n`;
   });
 
-  isi += `--------------------------------
-Total       Rp${formatRupiah(transaksi.total).padStart(10)}
-Bayar       Rp${formatRupiah(bayar).padStart(10)}
-Kembali     Rp${formatRupiah(kembalian).padStart(10)}
---------------------------------
-
-  Terima kasih atas kunjungan Anda
-`;
-
-  isi += `</pre>`;
+  isi += `--------------------------------\n`;
+  isi += `${padRight('Total', 10)}Rp${padLeft(formatRupiah(transaksi.total), 13)}\n`;
+  isi += `${padRight('Bayar', 10)}Rp${padLeft(formatRupiah(bayar), 13)}\n`;
+  isi += `${padRight('Kembali', 10)}Rp${padLeft(formatRupiah(kembalian), 13)}\n`;
+  isi += `--------------------------------\n\n`;
+  isi += centerText('Terima kasih atas') + '\n';
+  isi += centerText('berbelanja di toko kami') + '\n';
+  isi += '</pre>';
 
   container.innerHTML = isi;
   document.getElementById('modalStruk').classList.remove('hidden');
   document.getElementById('strukButtons').classList.remove('hidden');
 }
-        
+     
 function cetakRawBT(transaksi) {
   let struk = '';
   struk += ' TOKO POJOK BAHRIYAH\n';
