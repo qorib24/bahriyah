@@ -2733,33 +2733,40 @@ function tampilkanStruk(transaksi, pelanggan, bayar, kembalian) {
   const jam = tanggalObj.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
   let isi = `
-<pre style="font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.4;">
+<pre style="
+  font-family: 'Consolas', monospace;
+  font-size: 11px;
+  line-height: 1.2;
+  color: #000;
+  margin: 0;
+  max-width: 250px;
+  white-space: pre-wrap;
+">
 
-${tanggal.padEnd(20)}${pelanggan.namaToko}
+${tanggal}  ${pelanggan.namaToko}
 ${jam}
-------------------------------------------`;
+--------------------------------
+`;
 
   transaksi.items.forEach(item => {
     const qty = Number(item.qty) || 0;
     const harga = Number(item.hargaSatuan) || 0;
     const subtotal = qty * harga;
 
-    isi += `
-${item.nama.toUpperCase()}
-${String(qty)} x ${formatRupiah(harga).padEnd(10)}${'Rp'.padEnd(3)}${formatRupiah(subtotal).padStart(10)}`;
+    isi += `${item.nama.toUpperCase().slice(0, 24)}\n`;
+    isi += `${qty} x ${formatRupiah(harga).padEnd(10)}Rp${formatRupiah(subtotal).padStart(8)}\n`;
   });
 
-  isi += `
-------------------------------------------
-Total        ${'Rp'.padEnd(3)}${formatRupiah(transaksi.total).padStart(10)}
-Bayar (Cash) ${'Rp'.padEnd(3)}${formatRupiah(bayar).padStart(10)}
-Kembali      ${'Rp'.padEnd(3)}${formatRupiah(kembalian).padStart(10)}
-------------------------------------------
+  isi += `--------------------------------
+Total       Rp${formatRupiah(transaksi.total).padStart(10)}
+Bayar       Rp${formatRupiah(bayar).padStart(10)}
+Kembali     Rp${formatRupiah(kembalian).padStart(10)}
+--------------------------------
 
-         Terimakasih sudah berbelanja
-               di toko kami
-         
-</pre>`;
+  Terima kasih atas kunjungan Anda
+`;
+
+  isi += `</pre>`;
 
   container.innerHTML = isi;
   document.getElementById('modalStruk').classList.remove('hidden');
